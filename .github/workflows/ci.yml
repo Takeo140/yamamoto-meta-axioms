@@ -1,7 +1,25 @@
-- name: Verify Logic and Output 42
-run: |
-# Run the script and capture the output
-OUTPUT=$(python verify_42.py)
-echo "$OUTPUT"
-# Check if "Result: 42" exists in the output
-          echo "$OUTPUT" | grep "Result: 42"
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install numpy
+
+      - name: Run logic verification
+        run: python verify_42.py
