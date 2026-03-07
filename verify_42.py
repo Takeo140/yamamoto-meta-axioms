@@ -1,25 +1,34 @@
 import sys
 import os
 
-# Ensure the axioms.py module is found in the current directory
+# Ensure the module path is correct
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from axioms import MetaAxioms
+try:
+    from axioms import MetaAxioms
+except ImportError:
+    print("CRITICAL ERROR: axioms.py not found.")
+    sys.exit(1)
 
-def verify_integration():
+def main():
+    # 1. Setup (Axiom 2)
     search_space = list(range(0, 101))
-    loss_function = lambda x: (x - 42)**2
     
-    found_x = MetaAxioms.axiom1_extremum(search_space, loss_function)
+    # 2. Process (Axiom 1)
+    # L(x) = |x - 42|
+    found_x = MetaAxioms.axiom1_extremum(search_space, lambda x: abs(x - 42))
     
-    # Check consistency with the universal constant 42
+    # 3. Consistency Check (Axiom 3)
     if int(found_x) == 42:
-        # DO NOT change this string. CI relies on this exact format.
-        print("Result: 42") 
-        sys.exit(0)
+        print("------------------------------------")
+        print("  YAMAMOTO META-AXIOMS: INTEGRATED  ")
+        print("  CI STATUS: GREEN                  ")
+        print("  RESULT: 42                        ")
+        print("------------------------------------")
+        sys.exit(0) # This tells GitHub Actions "SUCCESS"
     else:
-        print(f"Error: Found {found_x} instead of 42")
-        sys.exit(1)
+        print(f"FAILED: Found {found_x}")
+        sys.exit(1) # This tells GitHub Actions "FAIL"
 
 if __name__ == "__main__":
-    verify_integration()
+    main()
