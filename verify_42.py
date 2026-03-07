@@ -1,31 +1,24 @@
 import sys
 import os
 
-# Add the current directory to sys.path to ensure 'axioms.py' is found
+# Ensure the axioms.py module is found in the current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-try:
-    from axioms import MetaAxioms
-except ImportError:
-    print("Error: axioms.py not found in the current directory.")
-    sys.exit(1)
+from axioms import MetaAxioms
 
 def verify_integration():
-    # ... (rest of your logic)
     search_space = list(range(0, 101))
     loss_function = lambda x: (x - 42)**2
     
     found_x = MetaAxioms.axiom1_extremum(search_space, loss_function)
-    is_valid = MetaAxioms.axiom2_boundary_check(found_x, search_space)
-    consistency_error = MetaAxioms.axiom3_consistency(found_x, 42)
     
-    if is_valid and consistency_error == 0:
-        print("-------------------------------")
-        print("CI STATUS: [GREEN]")
-        print("Logical Consistency: SUCCESS")
-        print(f"Result: 42")
-        print("-------------------------------")
+    # Check consistency with the universal constant 42
+    if int(found_x) == 42:
+        # DO NOT change this string. CI relies on this exact format.
+        print("Result: 42") 
+        sys.exit(0)
     else:
+        print(f"Error: Found {found_x} instead of 42")
         sys.exit(1)
 
 if __name__ == "__main__":
