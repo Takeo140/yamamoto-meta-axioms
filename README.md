@@ -1,8 +1,4 @@
-# Yamamoto Meta-Axioms Starter Kit
 
-[![CI Success](https://img.shields.io/badge/CI-Success-green.svg)](https://github.com/your-username/yamamoto-meta-axioms/actions)
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC_BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
-[![DOI](https://img.shields.io/badge/DOI-Zenodo-blue.svg)](https://doi.org/YOUR_DOI_HERE)
 # Yamamoto Meta-Axioms
 
 ![CI Success](https://img.shields.io/badge/CI-Success-green)
