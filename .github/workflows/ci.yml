@@ -1,23 +1,7 @@
-name: Meta-Axioms CI
-
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install Dependencies
-        run: pip install numpy
-
-      - name: Verify Logic and Output 42
-        # This line ensures the CI only passes if "Success: 42" is in the output
-        run: |
-          python verify_42.py | grep "Result: 42"
+- name: Verify Logic and Output 42
+run: |
+# Run the script and capture the output
+OUTPUT=$(python verify_42.py)
+echo "$OUTPUT"
+# Check if "Result: 42" exists in the output
+          echo "$OUTPUT" | grep "Result: 42"
