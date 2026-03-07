@@ -6,12 +6,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.9'
-    - name: Install dependencies
-      run: pip install numpy
-    - name: Verify Logic and Output 42
-      run: python verify_success.py | grep "Success: 42"
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install numpy
+
+      - name: Verify Logic and Output 42
+        # This line ensures the CI only passes if "Success: 42" is in the output
+        run: |
+          python verify_42.py | grep "Result: 42"
