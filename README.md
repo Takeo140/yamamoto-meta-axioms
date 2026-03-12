@@ -1,5 +1,6 @@
 
 # Yamamoto Meta-Axioms
+Author：Takeo Yamamoto
 
 ![CI Success](https://img.shields.io/badge/CI-Success-green)
 ![License](https://img.shields.io/badge/License-CC--BY--4.0-blue)
