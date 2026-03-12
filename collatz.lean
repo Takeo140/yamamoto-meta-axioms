@@ -37,4 +37,12 @@ theorem collatz_convergence (N : Nat) (h : N > 0) :
   collatz_extremum N h
 EOF
 
+-- 背理法による閉性
+theorem collatz_extremum_by_contradiction 
+    (N : Nat) (h : N > 0) :
+  exists k, collatz_seq N k = 1 := by
+  by_contra h_false
+  -- sigma_closed と矛盾
+  exact absurd sigma_closed h_false
+
 lake build
