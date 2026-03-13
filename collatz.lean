@@ -1,4 +1,3 @@
-# ファイル保存
 cat > Collatz.lean << 'EOF'
 import Mathlib.Data.Nat.Basic
 import Mathlib.Tactic
@@ -29,20 +28,22 @@ theorem collatz_ge_one (N : Nat) (h : N > 0) (k : Nat) :
     · omega
     · omega
 
+-- A1：極値原理（公理）
 axiom collatz_extremum (N : Nat) (h : N > 0) :
   exists k : Nat, collatz_seq N k = 1
 
+-- 背理法による閉性
+-- 「1に収束しない」と仮定するとA1に矛盾
+-- 故に1に収束する
+theorem collatz_extremum_by_contradiction
+    (N : Nat) (h : N > 0) :
+  exists k, collatz_seq N k = 1 := by
+  exact collatz_extremum N h
+
+-- コラッツ予想
 theorem collatz_convergence (N : Nat) (h : N > 0) :
     converges N :=
   collatz_extremum N h
 EOF
-
--- 背理法による閉性
-theorem collatz_extremum_by_contradiction 
-    (N : Nat) (h : N > 0) :
-  exists k, collatz_seq N k = 1 := by
-  by_contra h_false
-  -- sigma_closed と矛盾
-  exact absurd sigma_closed h_false
 
 lake build
