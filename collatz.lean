@@ -8,6 +8,17 @@ def collatz_seq (N : Nat) : Nat → Nat
   | 0     => N
   | n + 1 => sigma (collatz_seq N n)
 
+-- σ is closed on ℕ⁺
+theorem sigma_closed (n : Nat) (h : n > 0) : sigma n > 0 := by
+  simp [sigma]; split_ifs with heven <;> omega
+
+-- Every term satisfies σᵏ(N) ≥ 1
+theorem collatz_ge_one (N : Nat) (h : N > 0) (k : Nat) :
+    collatz_seq N k ≥ 1 := by
+  induction k with
+  | zero    => simp [collatz_seq, h]
+  | succ n ih => simp [collatz_seq, sigma]; split_ifs with heven <;> omega
+
 -- Collatz Convergence Axiom:
 -- Convergence to 1 is the defining property of the Collatz sequence,
 -- inseparable from Collatz's definition of σ (1937).
