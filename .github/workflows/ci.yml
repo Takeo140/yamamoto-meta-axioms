@@ -7,7 +7,21 @@ on:
     branches: [ main, master ]
 
 jobs:
-  verify:
+  verify-lean:
+    name: Lean 4 Formal Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Lean 4
+        uses: leanprover/lean4-action@v1
+
+      - name: Build and verify Lean proofs
+        run: lake build
+
+  verify-python:
+    name: Python Logic Verification
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
