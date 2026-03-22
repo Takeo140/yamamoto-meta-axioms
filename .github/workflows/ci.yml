@@ -14,8 +14,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Lean 4
-        uses: leanprover/lean4-action@v1
+      - name: Install elan (Lean version manager)
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Install Lean 4 via elan
+        run: elan install leanprover/lean4:stable
 
       - name: Build and verify Lean proofs
         run: lake build
