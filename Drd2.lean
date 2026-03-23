@@ -5,7 +5,7 @@ import Mathlib.Order.Bounds.Basic
 
 /-!
 # 論文題目: 統合失調症（DRD2）における構造的修復配列の数理的一意性の証明
-## 著者: 山本 竹雄 (Takeo Yamamoto) / 山本 葉舟
+## 著者: 山本 健夫 (Takeo Yamamoto) 
 ## ライセンス: CC BY 4.0 (Open Science)
 
 本コードは、ヒト共通ゲノムにおけるドパミンD2受容体（DRD2）の
@@ -235,5 +235,5 @@ end MetaAxiom
 最大値の存在が保証される。
 野生型配列への修復が数理的に一意の最適解となる。
 
-CC BY 4.0 — Takeo Yamamoto / 山本 葉舟 2025
+CC BY 4.0 — Takeo Yamamoto / 山本 健夫 2025
 -/
