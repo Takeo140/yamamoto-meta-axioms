@@ -5,7 +5,7 @@ import Mathlib.Data.Finset.Basic
 /-!
 # 癌ドライバー変異の数理的修復理論
 ## Formal Theory of Cancer Driver Mutation Repair
-## 著者: 山本 竹雄 (Takeo Yamamoto)
+## 著者: 山本 健夫 (Takeo Yamamoto)
 ## ライセンス: CC BY 4.0
 
 ## 概要
