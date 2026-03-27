@@ -1,51 +1,86 @@
 """
-axioms.py - The Core Logic of Yamamoto Meta-Axioms
-Copyright (c) 2026 Takeo Yamamoto
+axioms.py - Reference implementation of Yamamoto Meta-Axioms
+Author: Takeo Yamamoto
 License: CC BY 4.0
+
+Fixes from prior version:
+- axiom4: weights=None defaulted to all-1.0 (not a convex combination).
+  Now raises ValueError if weights do not sum to 1.
+- axiom3: return value changed from int (0/1) to bool for clarity.
+- Added normalize_weights() helper for caller convenience.
 """
 
 import numpy as np
 
+
 class MetaAxioms:
     """
-    Reference implementation of the four Meta-Axioms for 
-    consistent and efficient computing.
+    Reference implementation of the four Meta-Axioms.
+    Each method corresponds to one axiom (A1–A4).
     """
-    
+
     @staticmethod
     def axiom1_extremum(search_space, loss_function):
         """
-        Axiom 1: Extremum Principle
-        Finds x that extremizes (minimizes) the conceptual loss L(x).
+        A1: Extremum Principle
+        Returns x* = argmin_{x in X} L(x).
         """
         costs = [loss_function(x) for x in search_space]
-        return search_space[np.argmin(costs)]
+        return search_space[int(np.argmin(costs))]
 
     @staticmethod
     def axiom2_boundary_check(x, boundary_condition):
         """
-        Axiom 2: Topological Space
-        Ensures the element x exists within the defined boundary X.
+        A2: Topological Space
+        Returns True iff x lies within the defined domain X.
         """
         return x in boundary_condition
 
     @staticmethod
     def axiom3_consistency(found_value, expected_value):
         """
-        Axiom 3: Logical Consistency
-        Evaluates C[F] = 0. Returns 0 if consistent, 1 if contradictory.
+        A3: Logical Consistency
+        Returns True (consistent) iff found_value == expected_value.
+        Replaces prior int 0/1 return — bool is unambiguous.
         """
-        return 0 if found_value == expected_value else 1
+        return found_value == expected_value
+
+    @staticmethod
+    def normalize_weights(weights):
+        """
+        Helper: normalize a weight vector to a convex combination (sum=1).
+        Raises ValueError if all weights are zero.
+        """
+        total = sum(weights)
+        if total == 0:
+            raise ValueError("weights must not all be zero")
+        return [w / total for w in weights]
 
     @staticmethod
     def axiom4_hierarchical_sum(micro_results, weights=None):
         """
-        Axiom 4: Hierarchical Structure
-        Computes macro behavior as a weighted sum of micro-functions.
-        """
-        if weights is None:
-            weights = [1.0] * len(micro_results)
-        return sum(w * res for w, res in zip(weights, micro_results))
+        A4: Hierarchical Structure
+        F_macro = sum_i w_i * F_micro(i)
 
-# This module can be imported by any AI or Control System
-# to ensure mathematical-philosophical integrity.
+        weights must form a convex combination: all >= 0, sum == 1.
+        If weights is None, uniform weights are used (1/n each).
+        Raises ValueError if weights do not sum to 1 (tolerance 1e-9).
+        """
+        n = len(micro_results)
+        if n == 0:
+            return 0.0
+
+        if weights is None:
+            weights = [1.0 / n] * n  # uniform convex combination
+
+        total = sum(weights)
+        if abs(total - 1.0) > 1e-9:
+            raise ValueError(
+                f"A4 requires weights to sum to 1 (convex combination); "
+                f"got sum={total:.6f}. Use MetaAxioms.normalize_weights() "
+                f"to fix."
+            )
+        if any(w < 0 for w in weights):
+            raise ValueError("A4 requires all weights to be non-negative.")
+
+        return sum(w * res for w, res in zip(weights, micro_results))
