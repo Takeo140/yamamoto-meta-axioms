@@ -2,43 +2,68 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+
+  # ── Lean 4 formal verification ────────────────────────────────────────────
   verify-lean:
     name: Lean 4 Formal Verification
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Install elan (Lean version manager)
+      - name: Install elan
         run: |
-          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            -sSf | sh -s -- -y --no-modify-path
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
 
-      - name: Install Lean 4 via elan
-        run: elan install leanprover/lean4:stable
+      - name: Cache elan toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: elan-${{ hashFiles('lean-toolchain') }}
+          restore-keys: elan-
+
+      - name: Cache Lake build
+        uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ hashFiles('lean-toolchain', 'lakefile.lean', 'lakefile.toml') }}-${{ github.sha }}
+          restore-keys: |
+            lake-${{ hashFiles('lean-toolchain', 'lakefile.lean', 'lakefile.toml') }}-
 
       - name: Build and verify Lean proofs
         run: lake build
 
+      - name: Check no sorry
+        run: |
+          if grep -rn "\bsorry\b" --include="*.lean" .; then
+            echo "::error::sorry found — proofs incomplete"
+            exit 1
+          fi
+
+  # ── Python logic verification ─────────────────────────────────────────────
   verify-python:
     name: Python Logic Verification
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: pip install numpy
 
-      - name: Run logic verification
+      - name: Run A1–A4 integration tests
         run: python verify_42.py
