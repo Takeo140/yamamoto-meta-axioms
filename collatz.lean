@@ -50,7 +50,10 @@ theorem collatz_ge_one (N : Nat) (h : N > 0) (k : Nat) :
   | zero    => simp [collatz_seq]; omega
   | succ n ih =>
       simp only [collatz_seq]
-      exact sigma_closed _ (Nat.one_le_iff_ne_zero.mp ih)
+      -- ih : collatz_seq N n ≥ 1  (i.e. 1 ≤ …)
+      -- sigma_closed needs  collatz_seq N n > 0  (i.e. 0 < …)
+      -- Both are equivalent for ℕ; omega bridges the gap.
+      exact sigma_closed _ (by omega)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Result 3: Loop prohibition
