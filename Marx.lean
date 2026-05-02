@@ -1,28 +1,132 @@
--- 1. 労働の種類を定義
-inductive LaborType where
-  | Simple  : LaborType
-  | Complex : (specialty : String) → LaborType
+import Mathlib.Data.Rat.Basic
+import Mathlib.Tactic
 
--- 2. マルクス主義的な「価値」（労働時間のみ）
-def MarxianValue (hours : Float) : Float :=
-  1.0 * hours
+/-!
+# マルクス経済学の内部矛盾：形式的証明
 
--- 3. 資本主義的（現実的）な成果
--- 修正: else側を hours * 0.1 に（定数 0.1 は誤り）
-structure RealityResult where
-  labor        : LaborType
-  hours        : Float
-  breakthrough : Bool
-  outputValue  : Float :=
-    match labor with
-    | LaborType.Simple    => hours * 1.0
-    | LaborType.Complex _ => if breakthrough then hours * 10000.0 else hours * 0.1
+## 前回の反省点への対応
+前回の試みは「価値=線形、成果=非線形 ∴ 異なる」という同語反復だった。
+本証明はマルクス原典の二命題を忠実に形式化し、
+その間の数学的矛盾を内部的に導出する。
 
--- 4. 論理破綻の証明
--- 修正: ∀ h は h=0 で偽になるため、存在命題（∃）として正しく定式化
--- 具体的証人: hours=1.0, 製薬ブレークスルーあり
--- MarxianValue 1.0 = 1.0  ≠  10000.0 = outputValue
-theorem Marxian_Contradiction :
-    ∃ (r : RealityResult), MarxianValue r.hours ≠ r.outputValue :=
-  ⟨{ labor := .Complex "Pharma", hours := 1.0, breakthrough := true },
-   by native_decide⟩
+## 証明する命題
+1. **転形問題** (Bortkiewicz 1907):
+   有機的構成が不均等なとき、第1巻と第3巻は矛盾する
+2. **Steedman 負値定理** (Steedman 1977):
+   共同生産では労働価値が負になりうる（LTVの内部崩壊）
+
+## 正直な限界
+- マルクス主義の政治哲学・歴史唯物論は射程外
+- Sraffa の価値冗長性定理（最強の批判）は Perron-Frobenius が必要
+-/
+
+namespace MarxCritique
+
+-- ================================================================
+-- §1. 転形問題 (Transformation Problem)
+-- ================================================================
+
+/-- 生産部門 -/
+structure Sector where
+  c : ℚ  -- 不変資本 (constant capital)
+  v : ℚ  -- 可変資本 (variable capital)
+  s : ℚ  -- 剰余価値 (surplus value)
+
+/-- マルクス的価値（第1巻）: λ = c + v + s -/
+def marxValue (σ : Sector) : ℚ := σ.c + σ.v + σ.s
+
+/-- 平均利潤率（第3巻）: r = ΣS / Σ(C+V) -/
+def avgProfitRate (σ₁ σ₂ : Sector) : ℚ :=
+  (σ₁.s + σ₂.s) / (σ₁.c + σ₁.v + σ₂.c + σ₂.v)
+
+/-- 生産価格（第3巻）: P_i = (c_i + v_i)(1 + r) -/
+def prodPrice (σ : Sector) (r : ℚ) : ℚ := (σ.c + σ.v) * (1 + r)
+
+/-
+Bortkiewicz の批判の核心:
+マルクスは以下の二命題を同時に主張する:
+  [Vol.1] 価格は価値に比例する  (p_i ∝ λ_i)
+  [Vol.3] 競争により p_i = (c_i + v_i)(1 + r)
+
+有機的構成 q_i = c_i/v_i が部門間で異なる限り、
+p_i/p_j = λ_i/λ_j は成立しない。
+
+数値:
+  部門1 (資本集約的): c=80, v=20, s=20  → λ₁=120, P₁=150
+  部門2 (労働集約的): c=20, v=80, s=80  → λ₂=180, P₂=150
+  利潤率 r = 100/200 = 1/2
+
+  P₁/λ₁ = 150/120 = 5/4
+  P₂/λ₂ = 150/180 = 5/6
+  5/4 ≠ 5/6  ∴ Vol.1 と Vol.3 は矛盾
+-/
+
+theorem transformation_problem :
+    let σ₁ : Sector := ⟨80, 20, 20⟩  -- 資本集約的
+    let σ₂ : Sector := ⟨20, 80, 80⟩  -- 労働集約的
+    let r := avgProfitRate σ₁ σ₂
+    prodPrice σ₁ r / marxValue σ₁ ≠
+    prodPrice σ₂ r / marxValue σ₂ := by
+  native_decide
+
+-- ================================================================
+-- §2. Steedman の負値定理 (Negative Labor Values)
+-- ================================================================
+
+/-
+Steedman (1977) "Marx after Sraffa" の決定的反例:
+
+共同生産を含む2プロセス経済:
+  プロセス1: [3A, 1B, 5L] → [5A, 3B]
+  プロセス2: [1A, 2B, 2L] → [2A, 5B]
+
+Marxian value方程式（産出価値 = 投入価値 + 直接労働）:
+  P1: 5λ_A + 3λ_B = 3λ_A + λ_B + 5  ⟺  2λ_A + 2λ_B = 5
+  P2: 2λ_A + 5λ_B = λ_A + 2λ_B + 2  ⟺   λ_A + 3λ_B = 2
+
+唯一解: λ_A = 11/4 > 0,  λ_B = -1/4 < 0
+
+経済の存続可能性: 純産出 = 3A + 5B > 0  ✓（経済は機能している）
+しかし「財Bに体化された労働量 = -1/4」は概念的に無意味。
+LTV はこの経済を記述できない。
+-/
+
+/-- **定理2 (Steedman): 共同生産における負の労働価値** -/
+theorem steedman_negative_values :
+    let λ_A : ℚ := 11/4
+    let λ_B : ℚ := -1/4
+    2 * λ_A + 2 * λ_B = 5 ∧  -- プロセス1の価値方程式
+    λ_A + 3 * λ_B = 2    ∧   -- プロセス2の価値方程式
+    λ_B < 0 := by             -- 負値：LTVの概念的崩壊
+  refine ⟨?_, ?_, ?_⟩ <;> native_decide
+
+/-- **定理3 (一意性)**: 解は一意であり、逃げ道はない -/
+theorem steedman_solution_unique :
+    ∀ λ_A λ_B : ℚ,
+      2 * λ_A + 2 * λ_B = 5 →
+      λ_A + 3 * λ_B = 2 →
+      λ_A = 11/4 ∧ λ_B = -1/4 := by
+  intro λ_A λ_B h1 h2
+  constructor <;> linarith
+
+-- ================================================================
+-- §3. 理論的含意の形式化（未証明部分の正直な表明）
+-- ================================================================
+
+/-
+[未形式化: Sraffa/Samuelson の価値冗長性定理]
+
+物的技術行列 A と直接労働ベクトル l が与えられれば、
+利潤率 r と相対価格は以下のみで決定される:
+
+  p = (1+r) p A + w l  （Sraffa価格方程式）
+
+これはλ（労働価値）を一切参照しない。
+したがって労働価値は価格・利潤率の原因ではなく、
+計算上の回り道に過ぎない（冗長）。
+
+完全な形式化には線形代数 + Perron-Frobenius 定理が必要。
+現状の Mathlib でも不可能ではないが、数千行規模になる。
+-/
+
+end MarxCritique
