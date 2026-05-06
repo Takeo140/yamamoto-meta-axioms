@@ -1,353 +1,315 @@
-/-
-Meta-Axioms as the Conceptual Foundation of the Universe
-A Mathematical-Philosophical Framework in Lean 4 (Improved Version)
+-- Kotler's Marketing Theory: Formal Lean 4 Specification
+-- Philip Kotler (Marketing Management, 1967–2022) formalized under F-Theory A1--A4
 
-Author: Formalization by Claude (based on work by Takeo Yamamoto)
-License: CC BY 4.0
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Real.Basic
+import Mathlib.Data.List.Basic
+import Mathlib.Order.Defs
 
-This file provides a rigorous formalization of the four meta-axioms:
-1. Extremum Principle
-2. Topological Space
-3. Logical Consistency  
-4. Hierarchical Structure
+/-!
+# Kotler's Marketing Theory
 
-Improvements over v1:
-- Fixed type errors (embed⁻¹ issue)
-- Added actual proofs for basic theorems
-- Clearer hierarchical structure
-- More rigorous consistency definitions
+## Ontology
+- `Segment`          : market segment (STP — S)
+- `TargetStrategy`   : targeting decision (STP — T)
+- `PositioningAxis`  : value proposition axes (STP — P)
+- `MarketingMix`     : 4P / 7P
+- `ProductLifeCycle` : PLC stages
+- `BuyingProcess`    : consumer decision journey (5 stages)
+- `CLV`              : Customer Lifetime Value
+
+## F-Theory mapping
+- A1 (Extremum)   : firm maximizes CLV / market share
+- A2 (Topology)   : STP defines the competitive space; PLC is a closed ordered set
+- A3 (Consistency): positioning must be unique and credible (no contradictions)
+- A4 (Hierarchy)  : Market → Segment → Target → Marketing Mix → CLV
 -/
 
-import Mathlib.Topology.Basic
-import Mathlib.Analysis.Calculus.Deriv.Basic
-import Mathlib.Order.Bounds.Basic
-import Mathlib.Data.Real.Basic
-import Mathlib.Topology.MetricSpace.Basic
+-- ============================================================
+-- 1. Market Segmentation (STP — S)
+-- ============================================================
 
-/-! ## 1. Basic Structures -/
+/-- Four bases for segmentation -/
+inductive SegmentBase : Type where
+  | Geographic    : SegmentBase
+  | Demographic   : SegmentBase
+  | Psychographic : SegmentBase
+  | Behavioral    : SegmentBase
+  deriving DecidableEq, Repr
 
-/-- A conceptual function representing action, information loss, or similar quantities -/
-structure ConceptualFunction (X : Type*) where
-  eval : X → ℝ
-  
-namespace MetaAxioms
+/-- A market segment is characterised by a base and a measurable size ∈ ℝ≥0 -/
+structure Segment where
+  base        : SegmentBase
+  size        : ℝ
+  h_size      : 0 ≤ size
+  growthRate  : ℝ          -- annual growth rate (can be negative)
+  deriving Repr
 
-variable {X : Type*}
+/-- Segment attractiveness = size × (1 + growthRate) (A1: choose maximal) -/
+noncomputable def segmentAttractiveness (s : Segment) : ℝ :=
+  s.size * (1 + s.growthRate)
 
-/-! ## 2. Meta-Axiom 1: Extremum Principle -/
+/-- If growth rate ≥ −1 then attractiveness ≥ 0 -/
+theorem attractiveness_nonneg (s : Segment) (hg : -1 ≤ s.growthRate) :
+    0 ≤ segmentAttractiveness s := by
+  simp [segmentAttractiveness]
+  apply mul_nonneg s.h_size
+  linarith
 
-/-- The extremum principle: systems seek extrema of a conceptual function -/
-class ExtremumPrinciple (X : Type*) [TopologicalSpace X] where
-  /-- The conceptual function L -/
-  L : ConceptualFunction X
-  /-- The extremized outcome F[x] -/
-  F : X → ℝ
-  /-- Predicate stating that x is an extremum of L -/
-  isExtremum : X → Prop
-  /-- F[x] equals L(x) at extrema -/
-  extremum_property : ∀ x, isExtremum x → F x = L.eval x
+-- ============================================================
+-- 2. Targeting (STP — T)
+-- ============================================================
 
-/-- A point is a local minimum of a function -/
-def IsLocalMin [TopologicalSpace X] (f : X → ℝ) (x : X) : Prop :=
-  ∃ U ∈ 𝓝 x, ∀ y ∈ U, f x ≤ f y
+/-- Targeting strategy -/
+inductive TargetStrategy : Type where
+  | Undifferentiated  : TargetStrategy   -- mass marketing
+  | Differentiated    : TargetStrategy   -- multiple segments
+  | Concentrated      : TargetStrategy   -- single segment (niche)
+  | Micromarketing    : TargetStrategy   -- individual / local
+  deriving DecidableEq, Repr
 
-/-- A point is a local maximum of a function -/
-def IsLocalMax [TopologicalSpace X] (f : X → ℝ) (x : X) : Prop :=
-  ∃ U ∈ 𝓝 x, ∀ y ∈ U, f y ≤ f x
+/-- Number of segments served by each strategy (lower bound) -/
+def minSegmentsServed : TargetStrategy → ℕ
+  | TargetStrategy.Undifferentiated => 1
+  | TargetStrategy.Differentiated   => 2
+  | TargetStrategy.Concentrated     => 1
+  | TargetStrategy.Micromarketing   => 1
 
-/-- A point is a local extremum -/
-def IsLocalExtremum [TopologicalSpace X] (f : X → ℝ) (x : X) : Prop :=
-  IsLocalMin f x ∨ IsLocalMax f x
+-- ============================================================
+-- 3. Positioning (STP — P)
+-- ============================================================
 
-/-- Global minimum -/
-def IsGlobalMin (f : X → ℝ) (x : X) : Prop :=
-  ∀ y, f x ≤ f y
+/-- Positioning axes (value proposition dimensions) -/
+inductive PositioningAxis : Type where
+  | Quality       : PositioningAxis
+  | Price         : PositioningAxis
+  | Innovation    : PositioningAxis
+  | Service       : PositioningAxis
+  | Sustainability: PositioningAxis
+  deriving DecidableEq, Repr
 
-/-- Global maximum -/
-def IsGlobalMax (f : X → ℝ) (x : X) : Prop :=
-  ∀ y, f y ≤ f x
+/-- A positioning statement: primary axis + claimed relative score ∈ (0,1] -/
+structure Positioning where
+  primaryAxis : PositioningAxis
+  score       : ℝ
+  h_pos       : 0 < score
+  h_le        : score ≤ 1
+  deriving Repr
 
-/-! ## 3. Meta-Axiom 2: Topological Space with Boundaries -/
+/-- A3: Two brands cannot claim identical positioning on the same axis -/
+def positioningConflict (p q : Positioning) : Prop :=
+  p.primaryAxis = q.primaryAxis ∧ p.score = q.score
 
-/-- A bounded topological space with boundary conditions -/
-structure BoundedSpace (X : Type*) [TopologicalSpace X] where
-  /-- The ambient space dimension -/
-  n : ℕ
-  /-- The boundary of the space -/
-  boundary : Set X
-  /-- Boundary is the frontier of the universal set -/
-  boundary_is_frontier : boundary = frontier (Set.univ : Set X)
+theorem distinct_positioning_no_conflict
+    (p q : Positioning) (h : p.primaryAxis ≠ q.primaryAxis) :
+    ¬ positioningConflict p q := by
+  intro ⟨heq, _⟩
+  exact h heq
 
-/-- All phenomena occur within a defined space with boundaries -/
-class TopologicalConstraint (X : Type*) [TopologicalSpace X] where
-  bounded : BoundedSpace X
-  /-- The space is inhabited -/
-  nonempty : Nonempty X
+-- ============================================================
+-- 4. Marketing Mix — 4P / 7P (A4: hierarchical levers)
+-- ============================================================
 
-/-! ## 4. Meta-Axiom 3: Logical Consistency -/
+/-- Product levels (Kotler's three-level model) -/
+inductive ProductLevel : Type where
+  | Core        : ProductLevel   -- core benefit
+  | Actual      : ProductLevel   -- brand, quality, features, packaging
+  | Augmented   : ProductLevel   -- after-sales, warranty, delivery
+  deriving DecidableEq, Repr
 
-/-- Consistency constraint: C[F] = 0 means no self-contradictions -/
-class LogicalConsistency (F : Type*) where
-  /-- The consistency function -/
-  C : F → ℝ
-  /-- A system is consistent if C evaluates to 0 -/
-  isConsistent (f : F) : Prop := C f = 0
-  /-- Non-negative consistency measure -/
-  C_nonneg : ∀ f, 0 ≤ C f
+/-- Pricing strategy -/
+inductive PricingStrategy : Type where
+  | CostPlus          : PricingStrategy
+  | CompetitionBased  : PricingStrategy
+  | ValueBased        : PricingStrategy
+  | Skimming          : PricingStrategy
+  | Penetration       : PricingStrategy
+  deriving DecidableEq, Repr
 
-/-- A system satisfying logical consistency -/
-structure ConsistentSystem (F : Type*) [LogicalConsistency F] where
-  system : F
-  consistent : LogicalConsistency.C system = 0
+/-- Distribution channel -/
+inductive Channel : Type where
+  | Direct    : Channel   -- manufacturer → consumer
+  | Retailer  : Channel   -- manufacturer → retailer → consumer
+  | Wholesale : Channel   -- manufacturer → wholesaler → retailer → consumer
+  | Digital   : Channel
+  deriving DecidableEq, Repr
 
-/-! ## 5. Meta-Axiom 4: Hierarchical Structure (Improved) -/
+/-- Promotion mix elements -/
+inductive PromotionElement : Type where
+  | Advertising      : PromotionElement
+  | SalesPromotion   : PromotionElement
+  | PublicRelations  : PromotionElement
+  | PersonalSelling  : PromotionElement
+  | DirectMarketing  : PromotionElement
+  | DigitalMarketing : PromotionElement
+  deriving DecidableEq, Repr
 
-/-- Hierarchical composition of micro-functions into macro-functions -/
-structure HierarchicalStructure (Micro Macro : Type*) where
-  /-- Number of micro-components -/
-  n : ℕ
-  /-- Micro-level functions indexed by position -/
-  F_micro : Fin n → (Micro → ℝ)
-  /-- Weights for hierarchical composition -/
-  w : Fin n → ℝ
-  /-- Embedding of micro into macro level -/
-  embed : Micro → Fin n → Macro
-  /-- Macro-level function -/
-  F_macro : Macro → ℝ
-  /-- The hierarchical composition law (fixed version) -/
-  composition_law : ∀ (i : Fin n) (m : Micro),
-    F_macro (embed m i) = ∑ j : Fin n, w j * F_micro j m
+-- Extended 7P (services marketing)
+/-- People, Process, Physical Evidence -/
+structure ServiceExtension where
+  hasDedicatedStaff    : Bool
+  hasStandardProcess   : Bool
+  hasPhysicalEvidence  : Bool
 
-/-- Self-similarity in hierarchical structures -/
-def IsSelfSimilar {Micro Macro : Type*} (h : HierarchicalStructure Micro Macro) 
-    (scale : ℝ) : Prop :=
-  ∀ i j : Fin h.n, ∃ k : ℝ, ∀ m, h.F_micro i m = k * h.F_micro j m
+/-- Full 7P Marketing Mix -/
+structure MarketingMix where
+  -- 4P
+  productLevel   : ProductLevel
+  pricingStrat   : PricingStrategy
+  channel        : Channel
+  promotionMix   : List PromotionElement
+  -- 7P extensions
+  serviceExt     : ServiceExtension
 
-/-! ## 6. Integrated Conceptual Functional -/
+/-- A valid 4P mix has at least one promotion element -/
+def validMix (m : MarketingMix) : Prop :=
+  m.promotionMix.length ≥ 1
 
-/-- The integrated conceptual functional combining all four meta-axioms -/
-structure IntegratedFunctional (X : Type*) [TopologicalSpace X] where
-  /-- The conceptual function to be extremized -/
-  L : ConceptualFunction X
-  /-- Consistency measure on states -/
-  C : X → ℝ
-  /-- Consistency is non-negative -/
-  C_nonneg : ∀ x, 0 ≤ C x
-  /-- Hierarchical decomposition measure -/
-  H : X → ℝ
-  /-- Hierarchical measure is non-negative -/
-  H_nonneg : ∀ x, 0 ≤ H x
-  /-- The extremized functional -/
-  ℱ : X → ℝ
-  /-- Functional definition: combines L, consistency penalty, and hierarchical structure -/
-  functional_def : ∀ x, ℱ x = L.eval x + C x + H x
-  /-- At physical states, penalties vanish -/
-  physical_state_condition : ∀ x, C x = 0 → H x = 0 → ℱ x = L.eval x
+-- ============================================================
+-- 5. Product Life Cycle — PLC (A2: closed ordered set)
+-- ============================================================
 
-/-! ## 7. Proven Theorems -/
+/-- PLC stages -/
+inductive PLCStage : Type where
+  | Introduction : PLCStage
+  | Growth       : PLCStage
+  | Maturity     : PLCStage
+  | Decline      : PLCStage
+  deriving DecidableEq, Repr
 
-/-- Physical systems satisfy the extremum principle -/
-theorem physical_extremum_principle {X : Type*} [TopologicalSpace X] 
-    [ExtremumPrinciple X] (x : X) :
-    ExtremumPrinciple.isExtremum x → 
-    ExtremumPrinciple.F x = (ExtremumPrinciple.L : ConceptualFunction X).eval x :=
-  ExtremumPrinciple.extremum_property x
+/-- Natural ordering: Introduction < Growth < Maturity < Decline -/
+def PLCStage.toNat : PLCStage → ℕ
+  | PLCStage.Introduction => 0
+  | PLCStage.Growth       => 1
+  | PLCStage.Maturity     => 2
+  | PLCStage.Decline      => 3
 
-/-- Consistent systems have zero consistency measure -/
-theorem consistency_zero {F : Type*} [LogicalConsistency F] (f : F) :
-    LogicalConsistency.C f = 0 ↔ LogicalConsistency.isConsistent f := by
-  unfold LogicalConsistency.isConsistent
-  rfl
+instance : LE PLCStage where
+  le a b := a.toNat ≤ b.toNat
 
-/-- Non-negativity of consistency implies consistency measure has lower bound -/
-theorem consistency_bounded_below {F : Type*} [LogicalConsistency F] (f : F) :
-    0 ≤ LogicalConsistency.C f := 
-  LogicalConsistency.C_nonneg f
+/-- PLC is linearly ordered -/
+theorem plc_total_order (a b : PLCStage) :
+    a ≤ b ∨ b ≤ a := by
+  simp [LE.le, PLCStage.toNat]
+  omega
 
-/-- Hierarchical composition is well-defined -/
-theorem hierarchical_composition_exists {Micro Macro : Type*} 
-    (h : HierarchicalStructure Micro Macro) (m : Micro) (i : Fin h.n) :
-    ∃ val : ℝ, val = h.F_macro (h.embed m i) := by
-  use h.F_macro (h.embed m i)
+/-- Introduction precedes Decline -/
+theorem intro_before_decline :
+    PLCStage.Introduction ≤ PLCStage.Decline := by
+  simp [LE.le, PLCStage.toNat]
 
-/-- Physical states in integrated functional have minimal penalties -/
-theorem physical_state_minimal {X : Type*} [TopologicalSpace X] 
-    (F : IntegratedFunctional X) (x : X) (h_C : F.C x = 0) (h_H : F.H x = 0) :
-    F.ℱ x = F.L.eval x :=
-  F.physical_state_condition x h_C h_H
+/-- Recommended cash investment is highest in Growth stage (A1) -/
+def recommendedInvestment : PLCStage → ℕ
+  | PLCStage.Introduction => 2   -- build awareness
+  | PLCStage.Growth       => 3   -- maximize share
+  | PLCStage.Maturity     => 1   -- defend / harvest
+  | PLCStage.Decline      => 0   -- divest or maintain minimally
 
-/-- If consistency measure is zero, the system is consistent -/
-theorem zero_consistency_is_consistent {F : Type*} [LogicalConsistency F] (f : F) 
-    (h : LogicalConsistency.C f = 0) : 
-    LogicalConsistency.isConsistent f := by
-  rw [LogicalConsistency.isConsistent]
-  exact h
+-- ============================================================
+-- 6. Consumer Buying Process (5 stages)
+-- ============================================================
 
-/-! ## 8. Minimal Realizability (Occam's Razor) -/
+/-- Kotler's five-stage consumer decision process -/
+inductive BuyingStage : Type where
+  | NeedRecognition       : BuyingStage
+  | InformationSearch     : BuyingStage
+  | EvaluationAlternatives: BuyingStage
+  | PurchaseDecision      : BuyingStage
+  | PostPurchaseBehavior  : BuyingStage
+  deriving DecidableEq, Repr
 
-/-- A minimal realization satisfies Occam's razor -/
-def IsMinimalRealization {X : Type*} [TopologicalSpace X] 
-    (F : IntegratedFunctional X) (x : X) : Prop :=
-  F.C x = 0 ∧ F.H x = 0 ∧ 
-  ∀ y, F.C y = 0 → F.H y = 0 → F.L.eval x ≤ F.L.eval y
+def BuyingStage.toNat : BuyingStage → ℕ
+  | BuyingStage.NeedRecognition        => 0
+  | BuyingStage.InformationSearch      => 1
+  | BuyingStage.EvaluationAlternatives => 2
+  | BuyingStage.PurchaseDecision       => 3
+  | BuyingStage.PostPurchaseBehavior   => 4
 
-/-- Minimal realizations achieve the true extremum of L -/
-theorem minimal_realization_extremum {X : Type*} [TopologicalSpace X]
-    (F : IntegratedFunctional X) (x : X) (h : IsMinimalRealization F x) :
-    ∀ y, F.C y = 0 → F.H y = 0 → F.ℱ x ≤ F.ℱ y := by
-  intro y hy_C hy_H
-  have hx : F.ℱ x = F.L.eval x := F.physical_state_condition x h.1 h.2.1
-  have hy : F.ℱ y = F.L.eval y := F.physical_state_condition y hy_C hy_H
-  rw [hx, hy]
-  exact h.2.2 y hy_C hy_H
+/-- Process is strictly sequential: purchase follows need recognition -/
+theorem need_before_purchase :
+    BuyingStage.NeedRecognition.toNat < BuyingStage.PurchaseDecision.toNat := by
+  simp [BuyingStage.toNat]
 
-/-! ## 9. Stability and Perturbations -/
+/-- Post-purchase behavior is the final stage -/
+theorem post_purchase_is_last (s : BuyingStage) :
+    s.toNat ≤ BuyingStage.PostPurchaseBehavior.toNat := by
+  cases s <;> simp [BuyingStage.toNat]
 
-/-- Stability under perturbations (for metric spaces) -/
-def IsStable {X : Type*} [MetricSpace X] (f : X → ℝ) (x : X) (ε : ℝ) : Prop :=
-  ∀ y, dist x y < ε → |f x - f y| < ε
+-- ============================================================
+-- 7. Customer Lifetime Value — CLV (A1: maximize)
+-- ============================================================
 
-/-- A physical configuration is both an extremum and stable -/
-structure PhysicalConfiguration (X : Type*) [MetricSpace X] 
-    [TopologicalSpace X] [ExtremumPrinciple X] where
-  point : X
-  is_extremum : ExtremumPrinciple.isExtremum point
-  stability_radius : ℝ
-  stability_radius_pos : 0 < stability_radius
-  is_stable : IsStable ExtremumPrinciple.F point stability_radius
+/-- CLV inputs -/
+structure CLVInputs where
+  annualRevenue    : ℝ           -- average annual revenue per customer
+  annualCost       : ℝ           -- cost to serve per year
+  retentionRate    : ℝ           -- r ∈ [0,1)
+  discountRate     : ℝ           -- d > 0
+  h_rev_pos        : 0 ≤ annualRevenue
+  h_ret_lo         : 0 ≤ retentionRate
+  h_ret_hi         : retentionRate < 1
+  h_disc_pos       : 0 < discountRate
 
-/-! ## 10. Concrete Instantiations -/
+/-- CLV = (revenue − cost) × r / (1 + d − r)  [simplified perpetuity model] -/
+noncomputable def clv (c : CLVInputs) : ℝ :=
+  let margin := c.annualRevenue - c.annualCost
+  let denom  := 1 + c.discountRate - c.retentionRate
+  margin * (c.retentionRate / denom)
 
-section Examples
+/-- Denominator is strictly positive -/
+theorem clv_denom_pos (c : CLVInputs) :
+    0 < 1 + c.discountRate - c.retentionRate := by
+  linarith [c.h_ret_hi, c.h_disc_pos]
 
-/-- Example: ℝ with standard topology -/
-instance : TopologicalSpace ℝ := inferInstance
+/-- Helper: r / (1 + d − r) is monotone increasing in r
+    Proof: cross-multiply ⟹ r(1+d) ≤ r'(1+d) ⟹ r ≤ r'  (since d > 0) -/
+private lemma retention_ratio_mono
+    {r r' d : ℝ}
+    (hr     : r ≤ r')
+    (hr_hi  : r  < 1)
+    (hr'_hi : r' < 1)
+    (hd     : 0 < d) :
+    r / (1 + d - r) ≤ r' / (1 + d - r') := by
+  have hd1 : 0 < 1 + d - r  := by linarith
+  have hd2 : 0 < 1 + d - r' := by linarith
+  rw [div_le_div_iff hd1 hd2]
+  nlinarith
 
-/-- Example: Simple extremum principle on ℝ -/
-def SimpleRealExtremum : ExtremumPrinciple ℝ where
-  L := ⟨fun x => x^2⟩
-  F := fun x => x^2
-  isExtremum := fun x => x = 0
-  extremum_property := fun x hx => by simp [hx]
+/-- A1: CLV increases with retention rate (monotonicity, fully proved) -/
+theorem clv_increases_with_retention
+    (c : CLVInputs)
+    (h_margin : 0 < c.annualRevenue - c.annualCost)
+    (r' : ℝ) (hr'_lo : c.retentionRate ≤ r') (hr'_hi : r' < 1) :
+    clv c ≤ clv { c with
+      retentionRate := r'
+      h_ret_lo      := le_trans c.h_ret_lo hr'_lo
+      h_ret_hi      := hr'_hi } := by
+  simp only [clv]
+  apply mul_le_mul_of_nonneg_left _ (le_of_lt h_margin)
+  exact retention_ratio_mono hr'_lo c.h_ret_hi hr'_hi c.h_disc_pos
 
-/-- Example: Consistency on real numbers -/
-instance RealConsistency : LogicalConsistency ℝ where
-  C := fun x => |x|
-  C_nonneg := abs_nonneg
+-- ============================================================
+-- 8. STP + Mix Integration (A4: hierarchy)
+-- ============================================================
 
-/-- The integrated functional for our simple real example -/
-def SimpleIntegratedFunctional : IntegratedFunctional ℝ where
-  L := ⟨fun x => x^2⟩
-  C := fun x => |x - 0|
-  C_nonneg := abs_nonneg
-  H := fun _ => 0
-  H_nonneg := fun _ => le_refl 0
-  ℱ := fun x => x^2 + |x|
-  functional_def := fun x => by ring_nf
-  physical_state_condition := fun x hC hH => by
-    simp [hC]
-    ring
+/-- A complete market offer: STP + Mix + PLC stage -/
+structure MarketOffer where
+  segment     : Segment
+  targeting   : TargetStrategy
+  positioning : Positioning
+  mix         : MarketingMix
+  plcStage    : PLCStage
 
-/-- Zero is a minimal realization for the simple example -/
-theorem zero_is_minimal : IsMinimalRealization SimpleIntegratedFunctional 0 := by
-  constructor
-  · simp
-  constructor
-  · rfl
-  · intro y hy_C hy_H
-    simp [SimpleIntegratedFunctional] at hy_C hy_H
-    have : y = 0 := by
-      have h := abs_eq_zero.mp hy_C
-      exact h
-    rw [this]
-    linarith
+/-- A4: marketing investment should be consistent with PLC stage -/
+def plcConsistentInvestment (o : MarketOffer) : Prop :=
+  match o.plcStage with
+  | PLCStage.Introduction => o.mix.promotionMix.length ≥ 2  -- heavy launch spend
+  | PLCStage.Growth       => o.mix.promotionMix.length ≥ 2
+  | PLCStage.Maturity     => o.mix.promotionMix.length ≥ 1
+  | PLCStage.Decline      => True                           -- no constraint
 
-end Examples
-
-/-! ## 11. Applications to Physical Systems -/
-
-/-- Action principle in mechanics -/
-structure ActionPrinciple (Q : Type*) [TopologicalSpace Q] where
-  /-- Configuration space -/
-  config_space : Q
-  /-- Lagrangian function L(q, q̇, t) -/
-  L : Q → Q → ℝ → ℝ
-  /-- Action functional S[q] = ∫ L dt -/
-  S : (ℝ → Q) → ℝ
-  /-- Equations of motion from extremizing action -/
-  euler_lagrange : ∀ q : ℝ → Q, True  -- Placeholder for δS = 0
-
-/-- Information-theoretic entropy -/
-def ShannonEntropy {n : ℕ} (p : Fin n → ℝ) 
-    (h_prob : ∀ i, 0 ≤ p i) (h_sum : ∑ i : Fin n, p i = 1) : ℝ :=
-  - ∑ i : Fin n, p i * Real.log (p i)
-
-/-- Shannon entropy is non-negative -/
-theorem shannon_entropy_nonneg {n : ℕ} (p : Fin n → ℝ) 
-    (h_prob : ∀ i, 0 ≤ p i) (h_sum : ∑ i : Fin n, p i = 1) :
-    0 ≤ ShannonEntropy p h_prob h_sum := by
-  sorry  -- Requires detailed proof using convexity
-
-/-! ## 12. Meta-Theorems -/
-
-/-- Consistency is preserved under finite hierarchical composition -/
-theorem consistency_preserved {F : Type*} [LogicalConsistency F]
-    (systems : Fin n → F) 
-    (h : ∀ i, LogicalConsistency.isConsistent (systems i)) :
-    ∃ combined : F, LogicalConsistency.isConsistent combined := by
-  sorry  -- Requires construction of combined system
-
-/-- Extrema exist in compact spaces for continuous functions -/
-theorem compact_extremum_exists {X : Type*} [TopologicalSpace X] 
-    [CompactSpace X] (f : X → ℝ) (hf : Continuous f) 
-    (h_nonempty : Nonempty X) :
-    (∃ x : X, IsGlobalMin f x) ∧ (∃ x : X, IsGlobalMax f x) := by
-  sorry  -- Follows from extreme value theorem in Mathlib
-
-/-! ## 13. Philosophical Principles -/
-
-/-- Unity principle: all phenomena reduce to the integrated functional -/
-theorem unity_principle {X : Type*} [TopologicalSpace X] 
-    (phenomenon : X → ℝ) (h : Continuous phenomenon) :
-    ∃ F : IntegratedFunctional X, ∀ x, ∃ ε > 0, |phenomenon x - F.ℱ x| < ε := by
-  sorry  -- Conceptual framework, not rigorously provable
-
-/-- Occam's razor: simplest explanation among equivalent ones -/
-theorem occam_razor {X : Type*} [TopologicalSpace X]
-    (F : IntegratedFunctional X) (x y : X) 
-    (h_equiv : F.ℱ x = F.ℱ y)
-    (h_x_min : IsMinimalRealization F x)
-    (h_y_cons : F.C y = 0 ∧ F.H y = 0) :
-    F.L.eval x ≤ F.L.eval y := 
-  h_x_min.2.2 y h_y_cons.1 h_y_cons.2
-
-/-! ## 14. Summary of the Four Meta-Axioms -/
-
-/-- A universe structure satisfying all four meta-axioms -/
-structure UniverseModel (X : Type*) [TopologicalSpace X] where
-  /-- Meta-Axiom 1: Extremum Principle -/
-  extremum : ExtremumPrinciple X
-  /-- Meta-Axiom 2: Topological Constraint -/
-  topology : TopologicalConstraint X
-  /-- Meta-Axiom 3: Logical Consistency on states -/
-  consistency_space : LogicalConsistency X
-  /-- Meta-Axiom 4: Hierarchical Structure -/
-  hierarchy : HierarchicalStructure X X
-  /-- Integrated functional combining all axioms -/
-  integrated : IntegratedFunctional X
-
-/-- The four meta-axioms are mutually compatible -/
-theorem meta_axioms_compatible {X : Type*} [TopologicalSpace X] 
-    (model : UniverseModel X) : True := 
-  trivial
-
-end MetaAxioms
-
-/-! ## 15. Closing Remarks -/
-
-/-- This formalization demonstrates the meta-axioms framework 
-    with actual proofs for basic theorems -/
-axiom meta_axioms_framework_valid : True
-
-/-- Readers can instantiate these axioms in their specific domains -/
-axiom domain_instantiation_encouraged : True
+/-- Any MarketOffer in Decline stage trivially satisfies investment consistency -/
+theorem decline_always_consistent (o : MarketOffer)
+    (hd : o.plcStage = PLCStage.Decline) :
+    plcConsistentInvestment o := by
+  simp [plcConsistentInvestment, hd]
