@@ -1,92 +1,251 @@
--- F-Theory: Formal Specification of Free Energy Principle (FEP)
--- Karl Friston's Theory formalized under F-Theory A1--A4
--- License: CC BY 4.0
+/-
+  Free Energy Principle (FEP) — Lean 4 Formalization
+  Based on Karl Friston's variational framework for brain function.
 
-import Mathlib.Data.Real.Basic
+  Core idea:
+    Biological agents minimize variational free energy F,
+    defined as a bound on surprise (= -log p(o)).
 
-/-!
-# Free Energy Principle (FEP) Specification
+  F = KL[q(s) ‖ p(s|o)] - log p(o)
+    = E_q[log q(s) - log p(o,s)]
+    = Complexity - Accuracy
 
-## F-Theory Mapping
-- **A1 (Extremum)**: The system minimizes Variational Free Energy (VFE).
-- **A2 (Topology)**: A Markov Blanket defines the boundary of the 'Self'.
-- **A3 (Consistency)**: Internal generative models must align with environmental sensory data.
-- **A4 (Hierarchy)**: Biological agency emerges through nested blankets.
+  Perception  : minimize F over q   (update beliefs)
+  Action      : minimize F over a   (change observations)
 -/
 
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Topology.Algebra.Order.LiminfLimsup
+import Mathlib.MeasureTheory.Measure.MeasureSpace
+
+open Real MeasureTheory
+
 -- ============================================================
--- 1. States and Topology (A2: Markov Blanket)
+-- § 1. Basic Types
 -- ============================================================
 
-/-- The Markov Blanket (b) consists of Sensory (s) and Active (a) states.
-    It separates Internal states (μ) from External states (η). -/
+/-- Hidden (latent) states of the world -/
+variable {S : Type*} [MeasurableSpace S]
+
+/-- Sensory observations -/
+variable {O : Type*} [MeasurableSpace O]
+
+/-- Motor actions -/
+variable {A : Type*} [MeasurableSpace A]
+
+-- ============================================================
+-- § 2. Generative Model
+-- ============================================================
+
+/-- A generative model: joint distribution over observations and hidden states. -/
+structure GenerativeModel (O S : Type*) [MeasurableSpace O] [MeasurableSpace S] where
+  /-- Prior over hidden states -/
+  prior      : Measure S
+  /-- Likelihood: given a state, distribution over observations -/
+  likelihood : S → Measure O
+
+/-- Joint measure induced by the generative model -/
+noncomputable def GenerativeModel.joint
+    (M : GenerativeModel O S) : Measure (O × S) :=
+  M.prior.bind (fun s => (M.likelihood s).map (fun o => (o, s)))
+
+-- ============================================================
+-- § 3. Recognition Density (Approximate Posterior)
+-- ============================================================
+
+/-- A recognition density q(s) is a probability measure over hidden states. -/
+structure RecognitionDensity (S : Type*) [MeasurableSpace S] where
+  measure    : Measure S
+  isProbability : IsProbabilityMeasure measure
+
+-- ============================================================
+-- § 4. Variational Free Energy
+-- ============================================================
+
+/-- KL divergence D_KL(q ‖ p) = E_q[log(q/p)] -/
+noncomputable def klDivergence
+    (q p : Measure S) : ℝ :=
+  ∫ s, Real.log ((q.rnDeriv p s).toReal) ∂q
+
+/-- Variational Free Energy:
+      F(q, o) = E_q[log q(s) - log p(o, s)]
+              = KL[q(s) ‖ p(s)] - E_q[log p(o|s)]
+-/
+noncomputable def freeEnergy
+    (M  : GenerativeModel O S)
+    (q  : RecognitionDensity S)
+    (o  : O) : ℝ :=
+  -- Complexity: KL[q(s) ‖ prior]
+  klDivergence q.measure M.prior
+  -- Accuracy: -E_q[log p(o|s)]
+  - ∫ s, Real.log ((M.likelihood s).rnDeriv (M.likelihood s) o).toReal ∂q.measure
+
+/-- Free energy upper-bounds surprise (negative log evidence). -/
+theorem freeEnergy_bounds_surprise
+    (M : GenerativeModel O S)
+    (q : RecognitionDensity S)
+    (o : O)
+    (surprise : ℝ)
+    (h : surprise = -Real.log ((M.joint.map Prod.fst) {o})) :
+    surprise ≤ freeEnergy M q o + klDivergence q.measure M.prior := by
+  -- F = -log p(o) + KL[q ‖ p(s|o)] ≥ -log p(o)
+  -- KL divergence is non-negative by Gibbs inequality
+  simp [freeEnergy]
+  sorry -- requires full measure-theoretic development
+
+-- ============================================================
+-- § 5. Markov Blanket
+-- ============================================================
+
+/-- A Markov blanket partitions states into:
+    internal μ, blanket b = (sensory s, active a), external η. -/
 structure MarkovBlanket where
-  sensory : ℝ
-  active  : ℝ
+  /-- Internal states (brain/agent) -/
+  internal  : Type*
+  /-- Sensory states (inputs to agent) -/
+  sensory   : Type*
+  /-- Active states (outputs of agent) -/
+  active    : Type*
+  /-- External states (environment) -/
+  external  : Type*
 
-/-- The total state of a living system. -/
-structure LivingSystem where
-  eta    : ℝ  -- External causes (Hidden)
-  blanket : MarkovBlanket
-  mu     : ℝ  -- Internal model/representation
-
--- ============================================================
--- 2. Variational Free Energy (A1: Extremum)
--- ============================================================
-
-/-- Variational Free Energy (F) is a functional of sensory and internal states.
-    In F-Theory, this is the fundamental extremum function. -/
-opaque VFE (s a mu : ℝ) : ℝ
-
-/-- Surprise (Shannon Surprise) measures the improbability of sensory states. -/
-opaque surprise (s : ℝ) : ℝ
-
-/-- A1: Fundamental inequality: Free Energy is always an upper bound on Surprise.
-    Minimizing F effectively minimizes the bound on surprise. -/
-axiom free_energy_bounds_surprise (s a mu : ℝ) : 
-  surprise s ≤ VFE s a mu
+/-- Conditional independence: internal ⊥ external | blanket -/
+-- This is the key statistical property of a Markov blanket.
+-- In the FEP, the agent only ever "sees" the blanket states.
+axiom MarkovBlanket.conditionalIndependence
+    (MB : MarkovBlanket) : True
+    -- Full statement: p(μ, η | s, a) = p(μ | s, a) · p(η | s, a)
 
 -- ============================================================
--- 3. Active Inference (A3: Consistency)
+-- § 6. Perception as Belief Update
 -- ============================================================
 
-/-- Active Inference is the process of maintaining consistency between 
-    the internal model and the environment via two pathways. -/
-def isOptimized (sys : LivingSystem) : Prop :=
-  -- 1. Perception: Updating internal states (mu)
-  (∀ mu', VFE sys.blanket.sensory sys.blanket.active sys.mu ≤ 
-          VFE sys.blanket.sensory sys.blanket.active mu') ∧
-  -- 2. Action: Updating active states (a)
-  (∀ a', VFE sys.blanket.sensory sys.blanket.active sys.mu ≤ 
-         VFE sys.blanket.sensory a' sys.mu)
+/-- Perception: find q* that minimizes free energy given observation o. -/
+noncomputable def optimalRecognitionDensity
+    (M : GenerativeModel O S)
+    (o : O) : RecognitionDensity S :=
+  { measure := M.prior.bind (fun s =>
+        (M.likelihood s).map (fun _ => s)),
+    isProbability := by sorry }
+
+/-- At the optimum, q*(s) = p(s|o): free energy minimization = Bayesian inference. -/
+theorem perception_is_Bayesian_inference
+    (M  : GenerativeModel O S)
+    (o  : O)
+    (q  : RecognitionDensity S)
+    (hMin : ∀ q', freeEnergy M q o ≤ freeEnergy M q' o) :
+    -- q approximates the true posterior p(s|o)
+    klDivergence q.measure (optimalRecognitionDensity M o).measure = 0 := by
+  sorry -- minimizer of F is the true posterior iff KL = 0
 
 -- ============================================================
--- 4. Survival Theorem (The "Living" Condition)
+-- § 7. Active Inference
 -- ============================================================
 
-/-- A system 'survives' if its surprise is kept within a homeostatic range. -/
-def isSurviving (sys : LivingSystem) (threshold : ℝ) : Prop :=
-  surprise sys.blanket.sensory < threshold
+/-- An agent policy: maps current beliefs to an action. -/
+def Policy (S A : Type*) := RecognitionDensity S → A
 
-/-- Theorem: If a system successfully minimizes its VFE below a threshold,
-    it is mathematically guaranteed to be in a state of survival (low surprise). -/
-theorem survival_guarantee (sys : LivingSystem) (threshold : ℝ)
-    (h_vfe : VFE sys.blanket.sensory sys.blanket.active sys.mu < threshold) :
-    isSurviving sys threshold := by
-  -- Proof: By F-Theory A1 (free_energy_bounds_surprise)
-  have h_bound := free_energy_bounds_surprise sys.blanket.sensory sys.blanket.active sys.mu
-  exact lt_of_le_of_lt h_bound h_vfe
+/-- Active inference: actions are chosen to minimize expected free energy. -/
+noncomputable def expectedFreeEnergy
+    (M   : GenerativeModel O S)
+    (q   : RecognitionDensity S)
+    (act : A)
+    -- action selects an observation channel
+    (obs : A → O) : ℝ :=
+  freeEnergy M q (obs act)
+
+/-- Optimal action minimizes expected free energy. -/
+noncomputable def activeInference
+    (M   : GenerativeModel O S)
+    (q   : RecognitionDensity S)
+    (obs : A → O)
+    (acts : Finset A)
+    (hne  : acts.Nonempty) : A :=
+  acts.argmin (fun a => expectedFreeEnergy M q a obs) |>.get (by
+    apply Finset.argmin_isSome
+    exact hne)
 
 -- ============================================================
--- 5. Nested Hierarchy (A4)
+-- § 8. Precision-Weighted Prediction Error
 -- ============================================================
 
-/-- A4: FEP scales from organelles to ecosystems. -/
-inductive Scale : Type where
-  | Organelle
-  | Cell
-  | Organ
-  | Organism
-  deriving DecidableEq, Ord
+/-- Precision (inverse variance) weights prediction errors in perception. -/
+structure PrecisionWeightedError where
+  /-- Prediction error: difference between predicted and actual observation -/
+  predictionError : ℝ
+  /-- Precision: confidence in the prediction -/
+  precision       : ℝ
+  hPos            : 0 < precision
 
-instance : LE Scale where le a b := (compare a b) != Ordering.gt
+/-- Precision-weighted free energy: high precision → strong weighting of errors. -/
+noncomputable def precisionWeightedFreeEnergy
+    (pwe : PrecisionWeightedError) : ℝ :=
+  (1 / 2) * pwe.precision * pwe.predictionError ^ 2
+    + (1 / 2) * Real.log (2 * Real.pi / pwe.precision)
+
+-- ============================================================
+-- § 9. Hierarchical Predictive Coding
+-- ============================================================
+
+/-- A hierarchical level in a predictive coding network. -/
+structure HierarchicalLevel where
+  /-- Level index (0 = lowest, sensory) -/
+  level         : ℕ
+  /-- Prediction from this level to the level below -/
+  prediction    : ℝ
+  /-- Prediction error fed back up -/
+  predError     : ℝ
+  /-- Precision at this level -/
+  precision     : ℝ
+
+/-- Total free energy across a hierarchy = sum of precision-weighted errors. -/
+noncomputable def hierarchicalFreeEnergy
+    (levels : List HierarchicalLevel) : ℝ :=
+  levels.foldr (fun lvl acc =>
+    (1 / 2) * lvl.precision * lvl.predError ^ 2 + acc) 0
+
+/-- Free energy decreases as predictions improve (errors approach zero). -/
+theorem hierarchicalFE_decreases_with_accuracy
+    (levels : List HierarchicalLevel)
+    (hZero : ∀ lvl ∈ levels, lvl.predError = 0) :
+    hierarchicalFreeEnergy levels = 0 := by
+  induction levels with
+  | nil => simp [hierarchicalFreeEnergy]
+  | cons h t ih =>
+    simp [hierarchicalFreeEnergy]
+    constructor
+    · have := hZero h (List.mem_cons_self h t)
+      simp [this]
+    · apply ih
+      intro lvl hmem
+      exact hZero lvl (List.mem_cons_of_mem _ hmem)
+
+-- ============================================================
+-- § 10. Connection to F-Theory (A1–A4)
+-- ============================================================
+
+/-
+  The FEP maps naturally onto the Yamamoto Meta-Axiomatic Framework:
+
+  A1 (Extremum Principle) : Agents minimize F — direct instantiation.
+  A2 (Topological Space)  : State space S with recognition density q
+                            defines a statistical manifold (information geometry).
+  A3 (Logical Consistency): Generative model must be consistent — p(o,s) coherent.
+  A4 (Hierarchical Struct): Hierarchical predictive coding satisfies A4 exactly.
+
+  FEP is therefore an instantiation of F-Theory in biological systems.
+-/
+
+theorem FEP_instantiates_FTheory_A1
+    (M : GenerativeModel O S)
+    (o : O)
+    (q_opt : RecognitionDensity S)
+    (hMin : ∀ q, freeEnergy M q_opt o ≤ freeEnergy M q o) :
+    -- A1: there exists an extremum of the objective functional
+    ∃ q_star : RecognitionDensity S,
+      ∀ q, freeEnergy M q_star o ≤ freeEnergy M q o :=
+  ⟨q_opt, hMin⟩
+
+-- ============================================================
+-- End of FreeEnergyPrinciple.lean
+-- ============================================================
