@@ -3,7 +3,7 @@
 Author：Takeo Yamamoto
 
 ![CI Success](https://img.shields.io/badge/CI-Success-green)
-LICENSE approach2.0
+LICENSE Apache 2.0
 [![DOI](https://zenodo.org/badge/1175073429.svg)](https://doi.org/10.5281/zenodo.19249991)
 ## Overview
 This repository provides a reference implementation of the **"Meta-Axioms"** proposed by Takeo Yamamoto. These axioms serve as a mathematical-philosophical framework to unify computational, physical, and intellectual systems.
