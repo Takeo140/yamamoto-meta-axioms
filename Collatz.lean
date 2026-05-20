@@ -23,20 +23,19 @@ theorem even_step_halves (n : Nat) (heven : n % 2 = 0) (hpos : n > 0) :
 theorem odd_step_produces_even (n : Nat) (hodd : n % 2 ≠ 0) :
     sigma n % 2 = 0 := by
   simp only [sigma]
-  split_ifs with h
-  · contradiction
+  by_cases h : n % 2 = 0
+  · exact absurd h hodd
   · omega
 
--- sorryなし: split_ifs + omega で解決
+-- sorryなし: omega で解決
 theorem two_step_contraction (n : Nat) (hodd : n % 2 ≠ 0) (h : n ≥ 3) :
     sigma (sigma n) < n := by
   simp only [sigma]
-  split_ifs with h1 h2
-  · contradiction
-  · omega
-  · have : (3 * n + 1) % 2 = 0 := by omega
-    contradiction
-  · omega
+  by_cases h1 : n % 2 = 0
+  · exact absurd h1 hodd
+  · have h2 : (3 * n + 1) % 2 = 0 := by omega
+    simp [h2]
+    omega
 
 -- 未解決予想: conjecture キーワード非存在のため theorem + sorry
 -- 「ここから先は未解決」を明示
