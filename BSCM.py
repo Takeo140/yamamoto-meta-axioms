@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Bounded Smooth Collatz Machine (BSCM) - 64-bit Engineering Version
+Bounded Smooth Collatz Machine (BSCM) - 64-bit Engineering Version (Optimized)
 Monotone Reduction δ: all branches state-reducing
 
 Author: Takeo Yamamoto
@@ -11,39 +11,25 @@ License: Apache-2.0
 
 MASK_64 = 0xFFFFFFFFFFFFFFFF  # 2**64 - 1
 
-def bscm_delta_64(s: int) -> int:
-    """
-    Engineering δ — 64-bit monotone reduction.
-    Even: s >> 1
-    Odd:  (s + 1) >> 1
-    Both branches strictly reduce state. No perturbation term.
-    """
-    s = s & MASK_64
-    if s % 2 == 0:
-        return s >> 1
-    else:
-        return ((s + 1) >> 1) & MASK_64
-
-
 def evaluate_bscm_complexity_64(input_val: int) -> int:
     """
     Projects arbitrary input into 64-bit odd state space,
     then counts steps to reach state 1.
-    Returns step count, or step count + 100_000_000 if a cycle is detected.
+    Optimized: Removed redundant cycle detection and inlined delta function.
     """
     if input_val == 0:
         return 0
 
-    initial_state = ((input_val % (1 << 63)) * 2 + 1) & MASK_64
-    current_state = initial_state
+    # 64ビットの奇数空間へのマッピング
+    current_state = ((input_val % (1 << 63)) * 2 + 1) & MASK_64
     total_clock = 0
-    visited_states = set()
 
+    # 単調減少するためサイクルは発生しない（visited_statesのセットは不要）
     while current_state != 1:
-        if current_state in visited_states:
-            return total_clock + 100_000_000
-        visited_states.add(current_state)
-        current_state = bscm_delta_64(current_state)
+        if current_state % 2 == 0:
+            current_state >>= 1
+        else:
+            current_state = ((current_state + 1) >> 1) & MASK_64
         total_clock += 1
 
     return total_clock
@@ -51,7 +37,7 @@ def evaluate_bscm_complexity_64(input_val: int) -> int:
 
 if __name__ == "__main__":
     print("=== Bounded Smooth Collatz Machine (BSCM) ===")
-    print("=== 64-bit Engineering Version ===")
+    print("=== 64-bit Engineering Version (Optimized) ===")
     print("License: Apache-2.0\n")
 
     test_inputs = [
