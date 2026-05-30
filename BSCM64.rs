@@ -1,19 +1,23 @@
-// Bounded Smooth Collatz Machine (BSCM) — Engineering Version
+// Bounded Smooth Collatz Machine (BSCM) — Engineering Version (Rust Optimized)
 // Author: Takeo Yamamoto
 // License: Apache 2.0
 
-const N: u64 = u64::MAX; // 18446744073709551615
+pub const N: u64 = u64::MAX; // 18446744073709551615
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Core transition function δ
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Engineering δ — State-reducing transition.
+/// Optimized with bitwise operations to prevent integer overflow.
 #[inline]
 pub fn bscm_delta(s: u64) -> u64 {
     if s % 2 == 0 {
-        s / 2
+        s >> 1
     } else {
-        (s + 1) / 2
+        // s が u64::MAX のとき、(s + 1) / 2 を直接行うとオーバーフローする。
+        // 代数的に同値な 「(s / 2) + 1」 に変形することで、オーバーフローを完全に回避。
+        (s >> 1) + 1
     }
 }
 
@@ -70,11 +74,21 @@ mod tests {
         assert!(result <= N);
     }
 
-    // Reduction property: all branches shrink state
+    // Reduction property: all branches shrink state (except boundary s = 1)
     #[test]
     fn test_delta_reduces() {
+        // s = 1 のときは 1 に収束するため、2以上で検証
         for s in [2u64, 4, 100, 1000, N - 1] {
             assert!(bscm_delta(s) < s);
         }
+    }
+
+    // Edge case test for u64::MAX to ensure no overflow panic occurs
+    #[test]
+    fn test_max_value_boundary() {
+        // 元のコードではここでパニックが発生していた
+        let res = bscm_delta(u64::MAX);
+        // (u64::MAX + 1) / 2 の本来の挙動である 2^63 になるべき
+        assert_eq!(res, 1u64 << 63); 
     }
 }
