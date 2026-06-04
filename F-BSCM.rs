@@ -33,6 +33,7 @@ pub fn bscm_control_step(current_state: u64, external_input: u64) -> u64 {
 // =============================================================================
 
 /// F-Theoryのトポロジー空間
+#[derive(Debug, Clone)]
 pub struct FTopologySpace {
     /// 各ノードは (重み, 値) のペア
     pub nodes: Vec<(u64, u64)>,
@@ -62,6 +63,18 @@ impl FTopologySpace {
     pub fn extract_top(&self) -> Option<(u64, u64)> {
         self.nodes.first().cloned()
     }
+
+    /// ノード数を取得
+    #[inline]
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+}
+
+impl Default for FTopologySpace {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // =============================================================================
@@ -69,6 +82,7 @@ impl FTopologySpace {
 // =============================================================================
 
 /// 時空統合マシン（F-BSCM 実装核）
+#[derive(Debug, Clone)]
 pub struct UnifiedMachine {
     /// 現在の有界状態（時間軸の盾）
     pub current_state: u64,
@@ -102,5 +116,98 @@ impl UnifiedMachine {
         for &input in inputs {
             self.step(input);
         }
+    }
+
+    /// 現在のマシン状態を取得
+    #[inline]
+    pub fn get_current_state(&self) -> u64 {
+        self.current_state
+    }
+
+    /// トップノードを抽出（空間の最高解）
+    #[inline]
+    pub fn get_top_solution(&self) -> Option<(u64, u64)> {
+        self.f_space.extract_top()
+    }
+}
+
+impl Default for UnifiedMachine {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+// =============================================================================
+// 4. Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bscm_delta_even() {
+        assert_eq!(bscm_delta(10), 5);
+        assert_eq!(bscm_delta(4), 2);
+    }
+
+    #[test]
+    fn test_bscm_delta_odd() {
+        assert_eq!(bscm_delta(5), 3);
+        assert_eq!(bscm_delta(9), 5);
+    }
+
+    #[test]
+    fn test_bscm_control_step() {
+        let result = bscm_control_step(10, 5);
+        assert_eq!(result, bscm_delta(15));
+    }
+
+    #[test]
+    fn test_ftopology_space_invariant() {
+        let mut space = FTopologySpace::new();
+        space.inject_node(100, 1);
+        space.inject_node(50, 2);
+        space.inject_node(200, 3);
+        
+        // 先頭が最大重みを持つことを確認
+        assert_eq!(space.extract_top(), Some((200, 3)));
+        assert_eq!(space.node_count(), 3);
+    }
+
+    #[test]
+    fn test_unified_machine_step() {
+        let mut machine = UnifiedMachine::new(10);
+        machine.step(5);
+        
+        // 状態: (10 + 5) / 2 = 7
+        assert_eq!(machine.get_current_state(), 8); // (15 + 1) / 2 = 8
+        assert_eq!(machine.get_top_solution(), Some((8, 8)));
+    }
+
+    #[test]
+    fn test_unified_machine_stream() {
+        let mut machine = UnifiedMachine::new(16);
+        machine.execute_stream(&[0, 1, 2]);
+        
+        // 複数ステップ後の最終状態を確認
+        assert!(machine.get_current_state() > 0);
+        assert!(machine.f_space.node_count() >= 3);
+    }
+
+    #[test]
+    fn test_default_implementations() {
+        let space: FTopologySpace = Default::default();
+        assert_eq!(space.node_count(), 0);
+        
+        let machine: UnifiedMachine = Default::default();
+        assert_eq!(machine.get_current_state(), 0);
+    }
+
+    #[test]
+    fn test_wrapping_behavior() {
+        // u64オーバーフロー時の挙動確認
+        let result = bscm_control_step(u64::MAX, 1);
+        assert!(result > 0);
     }
 }
