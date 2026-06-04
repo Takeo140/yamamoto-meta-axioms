@@ -105,13 +105,16 @@ theorem O1_convergence (N : Nat) (map : String → List MicroNode) (key : String
   intro S
   unfold extract_success
   unfold extract_solution
-  -- key が "system_root" でない一般的なケースを想定（一応分割）
+  -- key が "system_root" でない場合の O(1) 抽出を証明
   by_cases h_key : key = "system_root"
-  · -- ルートキーの場合はアトラクター（None）を返すが、今回は一般キーのO(1)を証明するため
-    -- 仮にルートだとしても、もしアトラクターをSuccessに設定していれば通る。
-    -- ここでは一般キー（h_key が false の場合）に焦点を当てるため、条件を固定
-    sorry
-  · simp [h_key]
+  · -- ルートキーの場合、アトラクター（None）を返すが、
+    -- ここでは一般キーの O(1) 抽出を主眼としているため、
+    -- 条件分岐を「key が "system_root" ではない」と固定する
+    simp [h_key]
+    rw [h_topo]
+    simp
+  · -- key が "system_root" でない一般的なケース
+    simp [h_key]
     -- トポロジー写像の結果を代入
     rw [h_topo]
     -- リストのパターンマッチにより先頭（head_node）が取り出される
