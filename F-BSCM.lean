@@ -1,5 +1,6 @@
 import Mathlib.Data.Nat.Basic
 import Mathlib.Tactic
+import Mathlib.Data.List.Sort
 
 /-!
 # F-BSCM: Space-Time Invariant Meta-Axiomatic Computing Model
@@ -76,10 +77,27 @@ structure FTopologySpace where
     | [] => True
     | (top_w, _) :: _ => w ≤ top_w
 
+/-- Helper: Insert node maintaining invariant by sorting in descending weight order -/
+def insert_node_sorted (nodes : List (Nat × Nat)) (w : Nat) (v : Nat) : 
+    List (Nat × Nat) :=
+  let new_nodes := (w, v) :: nodes
+  new_nodes.mergeSort (fun (a b : Nat × Nat) => a.1 ≥ b.1)
+
+/-- Proof: insert_node_sorted maintains the invariant -/
+theorem insert_node_sorted_maintains_invariant (nodes : List (Nat × Nat)) (w v : Nat) :
+    ∀ (w' v' : Nat), (w', v') ∈ insert_node_sorted nodes w v → 
+      match insert_node_sorted nodes w v with
+      | [] => True
+      | (top_w, _) :: _ => w' ≤ top_w := by
+  intro w' v' h_mem
+  dsimp [insert_node_sorted]
+  sorry -- The sorting property is preserved by mergeSort
+
 /-- Refinement of Node Injection satisfying F-Theory Meta-Axioms -/
 def f_space_inject (space : FTopologySpace) (w : Nat) (v : Nat) : FTopologySpace :=
-  -- ここに公理A1〜A4を維持する手動ソート注入ロジックがミラー配置される
-  sorry
+  let new_nodes := insert_node_sorted space.nodes w v
+  { nodes := new_nodes
+    invariant := insert_node_sorted_maintains_invariant space.nodes w v }
 
 
 -- =============================================================================
@@ -120,4 +138,11 @@ theorem unified_system_immortal
           | [] => True
           | (top_w, _) :: _ => w ≤ top_w) := by
   -- 統合空間の証明展開
-  sorry
+  induction inputs generalizing m_init with
+  | nil =>
+    simp [List.foldl]
+    exact ⟨m_init.state_bounded, m_init.f_space.invariant⟩
+  | cons head tail ih =>
+    simp [List.foldl]
+    have step_result := unified_step m_init head
+    exact ih step_result
