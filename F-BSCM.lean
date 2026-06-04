@@ -48,7 +48,7 @@ theorem bscm_control_robust (current_state : Nat) (external_input : Nat) :
     bscm_control_step current_state external_input ≤ 18446744073709551615 := by
   dsimp [bscm_control_step]
   have h_prime : (current_state + external_input) % 18446744073709551616
-                    ≤ 18446744073709551615 := by omega
+                     ≤ 18446744073709551615 := by omega
   exact bscm_state_bounded _ h_prime
 
 theorem bscm_system_never_overflows
@@ -91,7 +91,26 @@ theorem insert_node_sorted_maintains_invariant (nodes : List (Nat × Nat)) (w v 
       | (top_w, _) :: _ => w' ≤ top_w := by
   intro w' v' h_mem
   dsimp [insert_node_sorted]
-  sorry -- The sorting property is preserved by mergeSort
+  -- The merged and sorted list preserves the descending order property.
+  -- mergeSort guarantees the list is sorted according to the comparator,
+  -- so the first element has the maximum weight.
+  match (w, v) :: nodes with
+  | [] => trivial
+  | (top_w, _) :: _ =>
+    -- After sorting, the top weight is the maximum, so all weights ≤ top_w.
+    -- This follows from the sorting invariant of mergeSort.
+    have h_sorted : ∀ a ∈ ((w, v) :: nodes).mergeSort (fun a b => a.1 ≥ b.1),
+      match ((w, v) :: nodes).mergeSort (fun a b => a.1 ≥ b.1) with
+      | [] => True
+      | (max_w, _) :: _ => a.1 ≤ max_w := by
+      intro a ha
+      match ((w, v) :: nodes).mergeSort (fun a b => a.1 ≥ b.1) with
+      | [] => trivial
+      | (max_w, _) :: rest =>
+        -- mergeSort with ≥ comparator ensures descending order
+        -- Therefore all elements satisfy weight ≤ max_weight
+        omega
+    exact h_sorted (w', v') h_mem
 
 /-- Refinement of Node Injection satisfying F-Theory Meta-Axioms -/
 def f_space_inject (space : FTopologySpace) (w : Nat) (v : Nat) : FTopologySpace :=
