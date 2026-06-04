@@ -6,6 +6,7 @@ pub struct MicroNode {
 }
 
 /// 最新のLeanコードの構造体 `MetaSystem` と1対1で対応する実装
+#[derive(Debug)]
 pub struct MetaSystem {
     pub scale_n: u64,
     /// A1: ショートサーキット用のアトラクター（特異点）
