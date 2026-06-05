@@ -79,58 +79,37 @@ def extract_success (S : MetaSystem) (key : String) : Prop :=
 -- §5. Core Theorems (Advanced Proofs)
 -- ============================================================
 
-/-- Short-Circuit Principle (高度化版)
-    公理A1（アトラクターにSuccessがある）が満たされており、
-    かつルートキーへのアクセスであるならば、ハッシュや階層探索を完全にバイパスして
-    一撃 O(1) で Success が抽出できることを証明する。 -/
+/-- Short-Circuit Principle (高度化版) -/
 theorem short_circuit_principle (S : MetaSystem) (hA1 : A1_ExtremumPrinciple S) :
     extract_success S "system_root" := by
-  -- 関数の定義を展開する
   unfold extract_success
   unfold extract_solution
-  -- if-then-else の条件 "system_root" == "system_root" は true なので簡約される
   simp
-  -- 公理A1の仮定 `S.attractor = Some Success` を代入する
   exact hA1
 
-/-- O(1) Convergence — N-Independence Theorem (高度化版)
-    トポロジー空間の最高階層（リストの先頭）にSuccessが配置されている場合、
-    システムの規模 N がどれだけ巨大であっても、抽出は先頭要素の確認（1ステップ）で終わる。
-    すなわち、計算コストは N から完全に独立（O(1)収束）することを証明。 -/
+/-- O(1) Convergence — N-Independence Theorem (修正版) -/
 theorem O1_convergence (N : Nat) (map : String → List MicroNode) (key : String)
     (head_node : MicroNode) (tail : List MicroNode)
-    (h_topo : map key = head_node :: tail) (h_succ : head_node.value = Success) :
+    (h_topo : map key = head_node :: tail) (h_succ : head_node.value = Success) 
+    (h_not_root : key ≠ "system_root") : -- 【修正1】一般キーであることを仮定に追加
     let S := MetaSystem.mk N None map
     extract_success S key := by
-  intro S
+  -- 【修正2】letで束縛されたSは引数ではないため `intro S` はエラーになります。
+  -- ここでは、そのまま型を展開します。
+  dsimp only
   unfold extract_success
   unfold extract_solution
-  -- key が "system_root" でない場合の O(1) 抽出を証明
-  by_cases h_key : key = "system_root"
-  · -- ルートキーの場合、アトラクター（None）を返すが、
-    -- ここでは一般キーの O(1) 抽出を主眼としているため、
-    -- 条件分岐を「key が "system_root" ではない」と固定する
-    simp [h_key]
-    rw [h_topo]
-    simp
-  · -- key が "system_root" でない一般的なケース
-    simp [h_key]
-    -- トポロジー写像の結果を代入
-    rw [h_topo]
-    -- リストのパターンマッチにより先頭（head_node）が取り出される
-    simp
-    -- 先頭の値が Success であることを代入
-    exact h_succ
-
--- ============================================================
--- Summary of Advanced Features
--- ============================================================
-/-
-  この高度化Leanコードで達成されたこと：
-  1. `MetaSystem` が単一の文字列ではなく `String → List MicroNode` という
-     「キーバリューストレージ（ハッシュテーブルの数理モデル）」になりました。
-  2. 公理A1〜A4が、実際のデータ構造の不変条件（インバリアント）として意味を持つようになりました。
-  3. `short_circuit_principle` と `O1_convergence` が、
-     「ハッシュのショートカット」と「階層の先頭アクセス」という
-     現実の計算量 $O(1)$ のメカニズムを正しくトレースして証明できるようになりました。
--/
+  
+  -- 【修正3】「if key == "system_root" then ...」の分岐を、仮定 h_not_root を用いて簡約
+  -- Leanの `if` は `decide` を用いたマクロなので、if-then-else を直接書き換えます。
+  have h_if : (if key == "system_root" then None else match map key with | [] => None | head :: _ => Some head.value) 
+              = match map key with | [] => None | head :: _ => Some head.value := by
+    -- key == "system_root" が false であることを示す
+    have h_eq : (key == "system_root") = false := by
+      aesop
+    rw [h_eq]
+    rfl
+  
+  rw [h_if]
+  rw [h_topo]
+  exact h_succ
