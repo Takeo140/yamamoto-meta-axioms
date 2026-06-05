@@ -160,7 +160,8 @@ mod tests {
     #[test]
     fn test_bscm_control_step() {
         let result = bscm_control_step(10, 5);
-        assert_eq!(result, bscm_delta(15));
+        // 10 + 5 = 15 (奇数) -> (15 + 1) / 2 = 8
+        assert_eq!(result, 8);
     }
 
     #[test]
@@ -180,8 +181,8 @@ mod tests {
         let mut machine = UnifiedMachine::new(10);
         machine.step(5);
         
-        // 状態: (10 + 5) / 2 = 7
-        assert_eq!(machine.get_current_state(), 8); // (15 + 1) / 2 = 8
+        // 状態: 10 + 5 = 15 (奇数) -> (15 + 1) / 2 = 8
+        assert_eq!(machine.get_current_state(), 8);
         assert_eq!(machine.get_top_solution(), Some((8, 8)));
     }
 
