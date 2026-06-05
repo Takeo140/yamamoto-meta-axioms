@@ -18,11 +18,12 @@ fn bscm_control_step(current_state: u64, packet_size: u64) -> u64 {
 // 2. ネットワークルーター・バッファ管理実装
 // =============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum PacketPriority {
-    NetworkControl = 3, // ルーター間の制御信号（最優先：BGPやOSPFなど。アトラクター射影対象）
-    VoiceVideo = 2,     // リアルタイム通信（QoS保証）
     BestEffort = 1,     // 一般のWebトラフィック（通常のデータ転送）
+    VoiceVideo = 2,     // リアルタイム通信（QoS保証）
+    NetworkControl = 3, // ルーター間の制御信号（最優先：BGPやOSPFなど。アトラクター射影対象）
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +39,7 @@ pub struct FBSCMRouterBuffer {
     /// ギガビットのバーストトラフィックが来ても、64bitの符号なし整数境界を決して超えない
     pub traffic_state: u64,
     
-    /// F-Theory 空間ドメイン: パケットキュー（リングバッファの役割）
+    /// F-Theory 空間ドメイン: パケットキュー（優先度順保持）
     /// Meta-Axiom A4不変量により、常に priority の降順（Control -> Voice -> Effort）でソートを維持
     packet_space: VecDeque<NetworkPacket>,
 }
@@ -52,6 +53,9 @@ impl FBSCMRouterBuffer {
     }
 
     /// パケットの受信 (Space-Time Integrated Packet Ingress)
+    /// 
+    /// BSCMにより決定論的なsequence_idを生成し、F-Theoryの不変量を保ちながら
+    /// 優先度順にパケットをバッファへ挿入する。
     pub fn receive_packet(&mut self, data: Vec<u8>, priority: PacketPriority) {
         // 1. 時間の確定 (BSCM)
         // パケットの長さを外部入力として状態遷移。決定論的に一意な sequence_id が確定する。
@@ -68,19 +72,22 @@ impl FBSCMRouterBuffer {
 
         // 2. 空間の不変量維持 (F-Theory)
         // トポロジー空間（バッファ）にパケットを挿入。
-        // 自動的にソートされ、ルーターの制御信号（NetworkControl）が常にキューの先頭に配置される。
-        self.packet_space.push_back(packet);
-        self.packet_space.make_contiguous().sort_by(|a, b| {
-            (b.priority as u8).cmp(&(a.priority as u8))
-        });
+        // 優先度の降順を保つため、適切な位置に挿入する。
+        let insert_pos = self.packet_space
+            .iter()
+            .position(|p| p.priority < priority)
+            .unwrap_or(self.packet_space.len());
+        
+        self.packet_space.insert(insert_pos, packet);
     }
 
     /// 【O(1) Convergence】次にルーティング（転送）すべきパケットを一撃で取り出す
+    /// 
+    /// F-Theoryの証明（O1_convergence）が保証する通り、
+    /// どれだけ大量のDDoSパケット（BestEffort）がバッファに詰まっていても、
+    /// ルーターはキューの総数 N を走査することなく、先頭（Index 0）を O(1) で処理するだけで、
+    /// ネットワーク崩壊を防ぐための重要シグナルを確実に最優先転送できる。
     pub fn pop_next_routing_packet(&mut self) -> Option<NetworkPacket> {
-        // F-Theoryの証明（O1_convergence）が保証する通り、
-        // どれだけ大量のDDoSパケット（BestEffort）がバッファに詰まっていても、
-        // ルーターはキューの総数 N を走査することなく、先頭（Index 0）を O(1) で処理するだけで、
-        // ネットワーク崩壊を防ぐための重要シグナルを確実に最優先転送できる。
         self.packet_space.pop_front()
     }
 }
