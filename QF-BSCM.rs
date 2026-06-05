@@ -31,11 +31,11 @@ fn bscm_quantum_delta(phase_state: u64) -> u64 {
 // 2. 量子状態・トポロジー保護バッファ実装
 // =============================================================================
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum QuantumStatus {
-    TopologicallyProtected = 3, // ノイズから保護された最重要の量子基底（アトラクター対象）
-    CoherentData = 2,           // 通常の量子コヒーレンスデータ
     DecayedNoise = 1,           // デコヒーレンスによって崩壊したエラーノイズ
+    CoherentData = 2,           // 通常の量子コヒーレンスデータ
+    TopologicallyProtected = 3, // ノイズから保護された最重要の量子基底（アトラクター対象）
 }
 
 #[derive(Debug, Clone)]
@@ -82,8 +82,8 @@ impl QuantumFBSCMComputer {
         // 量子トポロジー空間に注入。ソートによって「トポロジー的に保護された状態」が常に先頭に集約される
         self.quantum_space.push_back(qubit);
         self.quantum_space.make_contiguous().sort_by(|a, b| {
-            // QuantumStatusの重みを最優先でソート
-            (b.status.clone() as u8).cmp(&(a.status.clone() as u8))
+            // QuantumStatusの重みを最優先でソート（降順）
+            b.status.cmp(&a.status)
         });
     }
 
