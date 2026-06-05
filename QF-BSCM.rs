@@ -52,7 +52,7 @@ pub struct QuantumFBSCMComputer {
     
     /// F-Theory 空間ドメイン: 観測・デコヒーレンスを待つ量子状態空間
     /// Meta-Axiom A4に基づき、生存確率・重要度（QuantumStatus）の降順にソートを維持
-    quantum_space: VecDeque<QubitState>,
+    pub quantum_space: VecDeque<QubitState>,
 }
 
 impl QuantumFBSCMComputer {
@@ -81,7 +81,10 @@ impl QuantumFBSCMComputer {
         // 2. 空間の不変量維持 (F-Theory)
         // 量子トポロジー空間に注入。ソートによって「トポロジー的に保護された状態」が常に先頭に集約される
         self.quantum_space.push_back(qubit);
-        self.quantum_space.make_contiguous().sort_by(|a, b| {
+        
+        // VecDequeueの最適なソート実装：必要な部分のみを連続化
+        let cont = self.quantum_space.make_contiguous();
+        cont.sort_by(|a, b| {
             // QuantumStatusの重みを最優先でソート（降順）
             b.status.cmp(&a.status)
         });
@@ -89,11 +92,40 @@ impl QuantumFBSCMComputer {
 
     /// 【O(1) Quantum Convergence】
     /// デコヒーレンスノイズがどれだけ混入しても、保護された「正しい量子状態」をO(1)で一撃抽出する
-    pub fn extract_protected_state(&self) -> Option<&QubitState> {
+    pub fn extract_protected_state(&self) -> Option<QubitState> {
         // F-Theoryのトポロジー収束の証明に基づき、空間内の全量子ビット数 N を走査することなく、
         // インデックス0（先頭）にアクセスするだけで、エラーに埋もれない最重要状態を定数時間で確保。
-        self.quantum_space.front()
+        self.quantum_space.front().cloned()
     }
+
+    /// 量子状態空間の現在の統計情報を取得
+    pub fn get_statistics(&self) -> QuantumStatistics {
+        let total_count = self.quantum_space.len();
+        let protected_count = self.quantum_space.iter()
+            .filter(|q| q.status == QuantumStatus::TopologicallyProtected)
+            .count();
+        let coherent_count = self.quantum_space.iter()
+            .filter(|q| q.status == QuantumStatus::CoherentData)
+            .count();
+        let noise_count = self.quantum_space.iter()
+            .filter(|q| q.status == QuantumStatus::DecayedNoise)
+            .count();
+
+        QuantumStatistics {
+            total_count,
+            protected_count,
+            coherent_count,
+            noise_count,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct QuantumStatistics {
+    pub total_count: usize,
+    pub protected_count: usize,
+    pub coherent_count: usize,
+    pub noise_count: usize,
 }
 
 // =============================================================================
@@ -126,4 +158,12 @@ fn main() {
         println!("Description:               {}", target_qubit.description);
         println!("Survival Probability:      {:.2}%", target_qubit.amplitude.probability() * 100.0);
     }
+
+    // 統計情報の出力
+    let stats = q_computer.get_statistics();
+    println!("\n--- Quantum State Space Statistics ---");
+    println!("Total quantum states:      {}", stats.total_count);
+    println!("Protected states:          {}", stats.protected_count);
+    println!("Coherent data states:      {}", stats.coherent_count);
+    println!("Decayed noise states:      {}", stats.noise_count);
 }
