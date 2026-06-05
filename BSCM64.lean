@@ -10,9 +10,9 @@ Author: Takeo Yamamoto
 License: Apache 2.0
 -/
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
 -- 1. Core transition function
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
 
 /--
   【Engineering δ】
@@ -26,9 +26,9 @@ def bscm_delta (s : Nat) : Nat :=
   else
     (s + 1) / 2
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
 -- 2. Control interface
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
 
 def bscm_control_step (current_state : Nat) (external_input : Nat) : Nat :=
   let s_prime := (current_state + external_input) % 18446744073709551616
@@ -39,35 +39,53 @@ def bscm_control_exec (initial_state : Nat) : List Nat → Nat
   | input :: inputs  =>
       bscm_control_exec (bscm_control_step initial_state input) inputs
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
 -- 3. Theorems
--- ─────────────────────────────────────────────────────────────────────────────
+-- ───────────────────────────────────────────────────────────────────
+
+theorem bscm_delta_reduces (s : Nat) (h : s > 1) : bscm_delta s < s := by
+  unfold bscm_delta
+  split_ifs with h1
+  · have : s / 2 < s := Nat.div_lt_iff_lt_mul_left (by omega) |>.mpr (by omega)
+    exact this
+  · have odd_s : s % 2 = 1 := by omega
+    have : (s + 1) / 2 < s := by omega
+    exact this
 
 theorem bscm_state_bounded (s : Nat) (h : s ≤ 18446744073709551615) :
     bscm_delta s ≤ 18446744073709551615 := by
-  dsimp [bscm_delta]
+  unfold bscm_delta
   split_ifs with h1
-  · omega
-  · omega
+  · have : s / 2 ≤ s := Nat.div_le_self s 2
+    omega
+  · have : (s + 1) / 2 ≤ (s + 1) := Nat.div_le_self (s + 1) 2
+    omega
 
 theorem bscm_control_robust (current_state : Nat) (external_input : Nat) :
     bscm_control_step current_state external_input ≤ 18446744073709551615 := by
-  dsimp [bscm_control_step]
-  have h_prime : (current_state + external_input) % 18446744073709551616
-                    ≤ 18446744073709551615 := by omega
+  unfold bscm_control_step
+  have h_prime : (current_state + external_input) % 18446744073709551616 ≤ 18446744073709551615 := by
+    have : (current_state + external_input) % 18446744073709551616 < 18446744073709551616 :=
+      Nat.mod_lt (current_state + external_input) (by omega)
+    omega
   exact bscm_state_bounded _ h_prime
 
 theorem bscm_system_never_overflows
     (initial_state : Nat) (input : Nat) (inputs : List Nat) :
     bscm_control_exec (bscm_control_step initial_state input) inputs
       ≤ 18446744073709551615 := by
-  -- `induction'` を Lean 4 標準の `induction` 構文に修正し、
-  -- 状態が遷移していくため `initial_state` を一般化 (generalizing) します。
+  generalize h : bscm_control_step initial_state input = start_state
+  rw [← h]
+  clear h
+  revert initial_state input
   induction inputs generalizing initial_state input with
   | nil =>
+    intro _ _
     dsimp [bscm_control_exec]
     exact bscm_control_robust initial_state input
   | cons head tail ih =>
+    intro init_state ext_input
     dsimp [bscm_control_exec]
-    -- 帰納法の仮定 (ih) を次の状態に適用します
-    exact ih (bscm_control_step initial_state input) head
+    have h1 : bscm_control_step init_state ext_input ≤ 18446744073709551615 :=
+      bscm_control_robust init_state ext_input
+    exact ih (bscm_control_step init_state ext_input) head
