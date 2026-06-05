@@ -1,14 +1,15 @@
 use std::collections::VecDeque;
+use std::hash::Hasher;
 
 // =============================================================================
 // 1. F-BSCM 数理コア（64bit形式に完全合致）
 // =============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogSeverity {
-    Critical = 3,  // 最高優先度（アトラクターへの射影対象）
-    Warning = 2,
     Info = 1,
+    Warning = 2,
+    Critical = 3,  // 最高優先度（アトラクターへの射影対象）
 }
 
 /// BSCM時間遷移関数 δ (State-Reducing & 64bit Bounded)
@@ -66,7 +67,6 @@ impl SecureLogSystem {
         // 2. ハッシュチェーンの生成 (改ざん防止の数理)
         // 現在のインデックス、メッセージ、直前のハッシュをミキシング
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        use std::hash::Hasher;
         hasher.write_u64(self.current_state);
         hasher.write(message.as_bytes());
         hasher.write_u64(self.last_hash);
@@ -80,9 +80,13 @@ impl SecureLogSystem {
         };
 
         // 3. F-Theory 空間へのインジェクション (A4不変量の維持)
-        // 挿入後に重み（Severity）の降順でソート（実務上は二分探索挿入等で最適化可能）
-        self.f_space.push_back(entry);
-        self.f_space.make_contiguous().sort_by(|a, b| (b.severity as u8).cmp(&(a.severity as u8)));
+        // 二分探索により、降順のソート順序を維持しながら O(N) で挿入
+        let insert_pos = self.f_space
+            .iter()
+            .position(|e| e.severity < severity)
+            .unwrap_or(self.f_space.len());
+        
+        self.f_space.insert(insert_pos, entry);
     }
 
     /// 【O(1) Convergence】最高優先度のログを一撃で抽出する
@@ -97,7 +101,26 @@ impl SecureLogSystem {
         // ログが途中で削除されたり、メッセージが書き換えられたりした場合、
         // ハッシュの連鎖が崩れるため、一発で検知可能
         // （ここにLeanの論理整合性 A3_LogicalConsistency が対応する）
-        true // 実際の製品コードでは先頭からハッシュを再計算してチェックする
+        
+        // 実装: 先頭からハッシュを再計算してチェック
+        let mut current_state: u64 = 0;
+        let mut last_hash: u64 = 0;
+        
+        for entry in &self.f_space {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            hasher.write_u64(entry.index);
+            hasher.write(entry.message.as_bytes());
+            hasher.write_u64(last_hash);
+            let expected_hash = hasher.finish();
+            
+            if entry.hash_chain != expected_hash {
+                return false;
+            }
+            
+            last_hash = entry.hash_chain;
+        }
+        
+        true
     }
 }
 
@@ -121,4 +144,8 @@ fn main() {
         println!("Message:           {}", top_alert.message);
         println!("Hash Chain:        {:X}", top_alert.hash_chain);
     }
+
+    // 整合性検証
+    println!("\n--- Integrity Verification ---");
+    println!("Chain Valid: {}", logger.verify_integrity());
 }
