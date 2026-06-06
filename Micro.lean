@@ -1,6 +1,7 @@
 import Mathlib.Data.Real.Basic
 import Mathlib.Topology.Instances.Real
 import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Data.Real.Sqrt
 
 /-!
   # 2財モデルにおける消費者最適化問題 (Consumer Optimization Problem)
@@ -8,7 +9,7 @@ import Mathlib.Analysis.Calculus.Deriv.Basic
   目的: 予算制約のもとで、効用関数を最大化する消費ベクトル (x, y) の性質を定義する。
 -/
 
-open Topology
+open Topology Real
 
 -- 経済的パラメーター（価格と所得）の定義
 structure Economy where
@@ -40,6 +41,9 @@ def IsOptimal (eco : Economy) (U : ℝ → ℝ → ℝ) (best : ConsumptionBundl
 /-! 
   ### コブ＝ダグラス型効用関数への適用
   U(x, y) = x^α * y^β  (α + β = 1, α > 0, β > 0)
+  
+  注記: 実数乗累乗は正数に対してのみ定義されるため、
+  内点解（x > 0, y > 0）での分析に限定。
 -/
 
 structure CobbDouglasUtility where
@@ -50,7 +54,7 @@ structure CobbDouglasUtility where
   sum_one : α + β = 1
 
 def cobbDouglas (u : CobbDouglasUtility) (x y : ℝ) : ℝ :=
-  (x ^ u.α) * (y ^ u.β)
+  if 0 < x ∧ 0 < y then (x ^ u.α) * (y ^ u.β) else 0
 
 /-- 
   定理のステートメント (Meta-Axiom /最適化の命題):
@@ -64,9 +68,23 @@ theorem optimal_bundle_satisfies_foc
     (h_opt : IsOptimal eco (cobbDouglas u) best)
     (h_interior_x : 0 < best.x)
     (h_interior_y : 0 < best.y) :
-    -- 導出される結果: 限界生産力（偏微分）の比（限界代替率）が価格比に等しい
-    -- (u.α * best.y) / (u.β * best.x) = eco.p_x / eco.p_y
+    -- 導出される結果: 限界代替率 (MRS) が価格比に等しい
+    -- MRS = (∂U/∂x) / (∂U/∂y) = (α * y) / (β * x) = p_x / p_y
     (u.α * best.y) * eco.p_y = (u.β * best.x) * eco.p_x := by
-  sorry -- 最適化問題の解の微分可能性とラグランジュ未定乗数法に基づく証明のコア（省略）
+  -- 最適化問題の解の微分可能性とラグランジュ未定乗数法に基づく証明のコア
+  -- 1. 予算制約が満たされていることを確認
+  have h_budget := h_opt.1
+  
+  -- 2. 内点での最適性：すべての予算制約を満たす消費計画より効用が高い
+  have h_best_max : ∀ (bundle : ConsumptionBundle), 
+    isBudgetFeasible eco bundle → cobbDouglas u bundle.x bundle.y ≤ cobbDouglas u best.x best.y :=
+    h_opt.2
+  
+  -- 3. 内点解での一次の条件：ラグランジュ乗数法の適用
+  -- ∇U = λ ∇p (すなわち、勾配が平行)
+  -- (∂U/∂x, ∂U/∂y) = λ(p_x, p_y)
+  -- これにより α/x * p_y = β/y * p_x が導かれる
+  
+  sorry
 
 end ConsumerOptimization
