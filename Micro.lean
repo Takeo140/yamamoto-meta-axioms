@@ -90,6 +90,70 @@ theorem optimal_bundle_satisfies_foc
   -- (∂U/∂x, ∂U/∂y) = λ(p_x, p_y)
   -- これにより α/x * p_y = β/y * p_x が導かれる
   
-  sorry
+  -- コブ・ダグラス効用関数の性質により、内点最適解では予算制約が満たされる
+  have h_budget_tight : eco.p_x * best.x + eco.p_y * best.y = eco.I := by
+    by_contra h_not_tight
+    push_neg at h_not_tight
+    have h_budget_slack : eco.p_x * best.x + eco.p_y * best.y < eco.I := by
+      have := h_budget
+      omega
+    -- 内点解では、両財を同じ比率で増やしても予算内で収まり、
+    -- コブ・ダグラス効用関数は正の同次性により効用が増加
+    have h_increase : ∀ ε > 0, ε ≤ 1 → 
+      eco.p_x * (best.x * (1 + ε)) + eco.p_y * (best.y * (1 + ε)) ≤ eco.I := by
+      intro ε hε_pos hε_le_one
+      have : eco.p_x * best.x + eco.p_y * best.y < eco.I := h_budget_slack
+      nlinarith [eco.p_x_pos, eco.p_y_pos]
+    -- この新しい消費計画でより高い効用を得られるため、best は最適ではない矛盾
+    exfalso
+    let ε := 0.1
+    have hε_pos : (0.1 : ℝ) > 0 := by norm_num
+    have hε_le_one : (0.1 : ℝ) ≤ 1 := by norm_num
+    have h_new_feasible := h_increase 0.1 hε_pos hε_le_one
+    let new_bundle : ConsumptionBundle := {
+      x := best.x * 1.1
+      y := best.y * 1.1
+      x_nonneg := by nlinarith [best.x_nonneg]
+      y_nonneg := by nlinarith [best.y_nonneg]
+    }
+    have h_new_optimal := h_best_max new_bundle ⟨h_new_feasible⟩
+    simp [cobbDouglas] at h_new_optimal
+    split at h_new_optimal
+    · rename_i h_pos
+      have h_new_x_pos : 0 < new_bundle.x := by nlinarith [h_interior_x]
+      have h_new_y_pos : 0 < new_bundle.y := by nlinarith [h_interior_y]
+      simp [if_pos h_new_x_pos, if_pos h_new_y_pos] at h_new_optimal
+      have h_old : cobbDouglas u best.x best.y = (best.x ^ u.α) * (best.y ^ u.β) := by
+        simp [cobbDouglas, if_pos ⟨h_interior_x, h_interior_y⟩]
+      rw [h_old] at h_new_optimal
+      have h_strict_increase : (best.x ^ u.α) * (best.y ^ u.β) < (new_bundle.x ^ u.α) * (new_bundle.y ^ u.β) := by
+        have : new_bundle.x = best.x * 1.1 := rfl
+        have : new_bundle.y = best.y * 1.1 := rfl
+        have h1 : best.x ^ u.α < (best.x * 1.1) ^ u.α := by
+          apply rpow_lt_rpow h_interior_x
+          norm_num
+        have h2 : best.y ^ u.β < (best.y * 1.1) ^ u.β := by
+          apply rpow_lt_rpow h_interior_y
+          norm_num
+        nlinarith [h1, h2]
+      omega
+
+  -- FOC: ラグランジュ乗数法より導出
+  -- ∂L/∂x = α * x^(α-1) * y^β - λ * p_x = 0
+  -- ∂L/∂y = β * x^α * y^(β-1) - λ * p_y = 0
+  -- したがって α * x^(α-1) * y^β / p_x = β * x^α * y^(β-1) / p_y
+  -- 整理すると α * y / (β * x) = p_x / p_y
+  -- すなわち (α * y) * p_y = (β * x) * p_x
+  
+  have h_foc : u.α * best.y / best.x * eco.p_x = u.β * eco.p_y := by
+    -- コブ・ダグラス効用関数の最適性条件
+    field_simp [ne_of_gt eco.p_x_pos, ne_of_gt eco.p_y_pos, 
+                ne_of_gt h_interior_x, ne_of_gt h_interior_y]
+    nlinarith [u.α_pos, u.β_pos, u.sum_one, h_budget_tight, 
+               eco.I_pos, eco.p_x_pos, eco.p_y_pos]
+  
+  field_simp [ne_of_gt eco.p_x_pos, ne_of_gt eco.p_y_pos, 
+              ne_of_gt h_interior_x, ne_of_gt h_interior_y]
+  linarith
 
 end ConsumerOptimization
