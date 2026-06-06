@@ -36,16 +36,18 @@ namespace OptimalEconomy
 /-- 
   エージェントの最適化行動（ミクロのリアリズム）
   手取り所得（税引後＋給付）から努力のコストを引いた「自己効用」を最大化する。
+  改善: max(・, 0) で負の効用を防止
 -/
 def agentUtility (system : InstitutionalDesign) (ag : Agent) (e : ℝ) : ℝ :=
-  ((1 - system.τ) * (ag.ability * e) + system.G) - (1/2 * e^2)
+  max 0 (((1 - system.τ) * (ag.ability * e) + system.G) - (1/2 * e^2))
 
 /-- 
   最適な努力量の導出 (インセンティブ整合性条件: Incentive Compatibility)
   一階の条件（FOC）より、最適な努力量は e* = (1 - τ) * A となる。
+  制約: e ≥ 0 (努力は非負)
 -/
 def optimalEffort (system : InstitutionalDesign) (ag : Agent) : ℝ :=
-  (1 - system.τ) * ag.ability
+  max 0 ((1 - system.τ) * ag.ability)
 
 /-- 
   個人の最大生産量（社会への貢献度）
@@ -55,19 +57,22 @@ def agentProduction (system : InstitutionalDesign) (ag : Agent) : ℝ :=
 
 /-- 
   政府の財政制約（サステナブル条件）
+  改善: τの上限チェックを追加し、τ → 1の共産主義崩壊を防止
   全員から徴収した税の総和（マクロのパイ）が、一律給付の総和（セーフティネット）以上である必要がある。
   ここでは2人（優秀層: rich, 普通層: poor）の簡易モデルで定式化。
 -/
 def isFiscalSustainable (system : InstitutionalDesign) (rich poor : Agent) : Prop :=
-  system.τ * (agentProduction system rich + agentProduction system poor) ≥ 2 * system.G
+  system.τ * (agentProduction system rich + agentProduction system poor) ≥ 2 * system.G ∧
+  system.τ < 1  -- 税率は100%未満（働く誘因を保持）
 
 /-- 
   社会的厚生関数 (Social Welfare Function): 
   社会全体の豊かさの評価指標。ここでは全員の効用の総和。
+  改善: 非負性を保証
 -/
 def socialWelfare (system : InstitutionalDesign) (rich poor : Agent) : ℝ :=
-  agentUtility system rich (optimalEffort system rich) + 
-  agentUtility system poor (optimalEffort system poor)
+  max 0 (agentUtility system rich (optimalEffort system rich) + 
+         agentUtility system poor (optimalEffort system poor))
 
 /-- 
   「一番良い経済理論」の定理ステートメント（最適化の解の存在）:
