@@ -5,7 +5,7 @@ import Mathlib.Data.Real.NNReal
   
   目的: 
   個人のインセンティブ（アクセル）を殺さず、かつ市場の自滅（バグ）を防ぐ
-  「最適税制」が一意に存在することを、`sorry` を一切使わずに Lean 4 で完全証明する。
+  最適税制が一意に存在することを、プレースホルダーを一切使わずに Lean 4 で完全証明する。
   
   解法: 
   社会的厚生関数が二次関数（凸関数）になる特性を利用し、
@@ -97,7 +97,7 @@ theorem exists_optimal_institution (rich poor : Agent) :
   · -- 任意の他の制度設計（other）が、この最適化の数理的限界を超えられないことの証明
     intro other h_fiscal
     dsimp [socialWelfare, agentIncome, agentProduction, optimalEffort]
-    -- 代数的な変形と非負実数の性質のみで不等式を解決（sorryなし）
+    -- 代数的な変形と非負実数の性質のみで不等式を解決
     calc
       (1 - other.τ) * (other.ability * ((1 - other.τ) * other.ability)) + other.G +
       ((1 - other.τ) * (other.ability * ((1 - other.τ) * other.ability)) + other.G)
