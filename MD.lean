@@ -1,106 +1,179 @@
-import Mathlib.Data.Real.NNReal
+import Mathlib.Data.Real.Basic
+import Mathlib.Algebra.Order.Ring.Lemmas
+import Mathlib.Tactic.Nlinarith
+import Mathlib.Tactic.Ring
 
 /-!
-  # メカニズムデザインに基づく「最適経済制度」の完全証明モデル
-  
-  目的: 
-  個人のインセンティブ（アクセル）を殺さず、かつ市場の自滅（バグ）を防ぐ
-  最適税制が一意に存在することを、プレースホルダーを一切使わずに Lean 4 で完全証明する。
-  
-  解法: 
-  社会的厚生関数が二次関数（凸関数）になる特性を利用し、
-  数学的な最適解（τ* = 1/3 などの具体的な制度設計）を直接構造体として組み立て、
-  それが他のすべての制度よりも厚生を高めることを代数的に検証・承認させる。
+  # メカニズムデザインに基づく「最適経済制度」の定式化
+
+  目的:
+  個人の利潤・生産インセンティブ（アクセル）を破壊せず、
+  かつ格差による市場崩壊（バグ）を防ぐ「最適税制・再分配」の数理構造を定義する。
+
+  ## 証明戦略（sorry除去）
+  - witness: τ=0, G=0 の InstitutionalDesign を明示的に構成
+  - isFiscalSustainable: 0 * (...) ≥ 2 * 0 は自明
+  - 最大性: 財政制約下で W(τ,G) ≤ (1/2)(1-τ²)(Ar²+Ap²) ≤ (1/2)(Ar²+Ap²) = W(0,0)
 -/
 
-open NNReal
-
-/-- 
-  社会の環境定義 (Institutional Design)
-  インセンティブと再分配のバランスを管理するアーキテクチャ。
+/--
+  社会の環境定義 (Institutional Framework)
+  インセンティブと再分配のバランスを管理するパラメータ
 -/
 structure InstitutionalDesign where
-  τ : ℝ≥0  -- 税率 (Tax Rate): 0 ≤ τ ≤ 1
-  G : ℝ≥0  -- 保障給付 (Minimum Guaranteed Income)
-  τ_le_one : τ ≤ 1
+  τ : ℝ  -- 税率 (Tax Rate): 0 ≤ τ < 1
+  G : ℝ  -- 保障給付 (Minimum Guaranteed Income / セーフティネット): G ≥ 0
+  τ_nonneg : 0 ≤ τ
+  τ_lt_one : τ < 1
+  G_nonneg : 0 ≤ G
 
-/-- 
+/--
   経済エージェント（個人）の定義
+  能力(A)に応じて、手取りが最大になるように自発的に努力量(e)を決定する。
 -/
 structure Agent where
-  ability : ℝ≥0  -- 個人の能力・技術力 (A > 0)
+  ability : ℝ     -- 個人の能力・IQ・技術力 (A > 0)
+  ability_pos : 0 < ability
 
 namespace OptimalEconomy
 
-/-- 
-  最適な努力量の導出 (Incentive Compatibility)
+/--
+  エージェントの最適化行動（ミクロのリアリズム）
+  手取り所得（税引後＋給付）から努力のコストを引いた「自己効用」を最大化する。
+-/
+def agentUtility (system : InstitutionalDesign) (ag : Agent) (e : ℝ) : ℝ :=
+  ((1 - system.τ) * (ag.ability * e) + system.G) - (1 / 2 * e ^ 2)
+
+/--
+  最適な努力量の導出 (インセンティブ整合性条件: Incentive Compatibility)
   一階の条件（FOC）より、最適な努力量は e* = (1 - τ) * A となる。
 -/
-def optimalEffort (system : InstitutionalDesign) (ag : Agent) : ℝ≥0 :=
+def optimalEffort (system : InstitutionalDesign) (ag : Agent) : ℝ :=
   (1 - system.τ) * ag.ability
 
-/-- 
-  個人の生産量: Y = A * e* = (1 - τ) * A^2
+/--
+  個人の最大生産量（社会への貢献度）
 -/
-def agentProduction (system : InstitutionalDesign) (ag : Agent) : ℝ≥0 :=
+def agentProduction (system : InstitutionalDesign) (ag : Agent) : ℝ :=
   ag.ability * (optimalEffort system ag)
 
-/-- 
-  政府の財政制約 (Fiscal Sustainability Condition)
-  徴収した税が、一律給付（セーフティネット）の総和以上であること。
+/--
+  政府の財政制約（サステナブル条件）
+  全員から徴収した税の総和が一律給付の総和以上である必要がある。
+  2人モデル（優秀層: rich, 普通層: poor）で定式化。
 -/
 def isFiscalSustainable (system : InstitutionalDesign) (rich poor : Agent) : Prop :=
   system.τ * (agentProduction system rich + agentProduction system poor) ≥ 2 * system.G
 
-/-- 
-  エージェントの最終的な所得（手取り＋給付）
--/
-def agentIncome (system : InstitutionalDesign) (ag : Agent) : ℝ≥0 :=
-  (1 - system.τ) * (agentProduction system ag) + system.G
+/--
+  社会的厚生関数 (Social Welfare Function):
+  社会全体の豊かさの評価指標。ここでは全員の効用の総和。
 
-/-- 
-  社会的厚生関数 (Social Welfare Function)
-  全員の最終的な所得の総和。
+  展開すると: W(τ,G) = (1/2)(1-τ)²(Ar²+Ap²) + 2G
 -/
-def socialWelfare (system : InstitutionalDesign) (rich poor : Agent) : ℝ≥0 :=
-  agentIncome system rich + agentIncome system poor
+def socialWelfare (system : InstitutionalDesign) (rich poor : Agent) : ℝ :=
+  agentUtility system rich (optimalEffort system rich) +
+  agentUtility system poor (optimalEffort system poor)
 
-/-- 
-  【完全証明：最適化の存在定理】
-  社会的厚生を最大化する具体的な制度設計（例：財政の限界バランス点）を直接構築し、
-  それが他の任意の持続可能な制度設計（other）と同等以上であることを証明する。
-  
-  ここでは、財政制約がジャストで均衡（等号）し、
-  かつインセンティブのロスを最小化する「中庸の設計（best）」の存在を完全に保証する。
+/-! ## 補題群 -/
+
+/-- agentUtility を optimalEffort で評価した閉形式 -/
+lemma agentUtility_optimalEffort (sys : InstitutionalDesign) (ag : Agent) :
+    agentUtility sys ag (optimalEffort sys ag) =
+    (1 / 2) * (1 - sys.τ) ^ 2 * ag.ability ^ 2 + sys.G := by
+  simp only [agentUtility, optimalEffort]
+  ring
+
+/-- socialWelfare の閉形式 -/
+lemma socialWelfare_eq (sys : InstitutionalDesign) (rich poor : Agent) :
+    socialWelfare sys rich poor =
+    (1 / 2) * (1 - sys.τ) ^ 2 * (rich.ability ^ 2 + poor.ability ^ 2) + 2 * sys.G := by
+  simp only [socialWelfare, agentUtility_optimalEffort]
+  ring
+
+/-- isFiscalSustainable の閉形式（agentProduction 展開後） -/
+lemma fiscalSustainable_eq (sys : InstitutionalDesign) (rich poor : Agent) :
+    isFiscalSustainable sys rich poor ↔
+    sys.τ * (1 - sys.τ) * (rich.ability ^ 2 + poor.ability ^ 2) ≥ 2 * sys.G := by
+  simp only [isFiscalSustainable, agentProduction, optimalEffort]
+  constructor <;> intro h <;> nlinarith [h]
+
+/--
+  財政制約下での socialWelfare の上界:
+  sustainable ならば W(τ,G) ≤ (1/2)(1-τ²)(Ar²+Ap²)
 -/
-theorem exists_optimal_institution (rich poor : Agent) :
-    ∃ (best : InstitutionalDesign), 
-      isFiscalSustainable best rich poor ∧ 
-      ∀ (other : InstitutionalDesign), isFiscalSustainable other rich poor → 
-        socialWelfare other rich poor ≤ (1 : ℝ≥0) * (agentProduction other rich + agentProduction other poor) + 2 * other.G := by
-  -- 1. 具体的な最適制度設計（プロトタイプ）を定義
-  let best_τ : ℝ≥0 := (1 / 2 : ℝ≥0)
-  let best_G : ℝ≥0 := (0 : ℝ≥0)
-  have h_le : best_τ ≤ 1 := by 
-    norm_num
-  let best : InstitutionalDesign := ⟨best_τ, best_G, h_le⟩
-  
-  -- 2. この制度が存在することを示すために、`use` タクティクで直接投入
-  use best
-  
-  -- 3. 財政サステナビリティと厚生の比較を代数的に結合
-  constructor
-  · -- 財政的にサステナブルであることの証明 (G=0 なので常に満たす)
-    dsimp [isFiscalSustainable]
-    rw [mul_zero]
-    exact zero_le _
-  · -- 任意の他の制度設計（other）が、この最適化の数理的限界を超えられないことの証明
-    intro other h_fiscal
-    dsimp [socialWelfare, agentIncome, agentProduction, optimalEffort]
-    -- 代数的な変形と非負実数の性質のみで不等式を解決
-    calc
-      (1 - other.τ) * (other.ability * ((1 - other.τ) * other.ability)) + other.G +
-      ((1 - other.τ) * (other.ability * ((1 - other.τ) * other.ability)) + other.G)
-      ≤ (1 : ℝ≥0) * (other.ability * ((1 - other.τ) * other.ability) + other.ability * ((1 - other.τ) * other.ability)) + 2 * other.G := by
-        rw [one_mul]
-        linarith
+lemma welfare_upper_bound (sys : InstitutionalDesign) (rich poor : Agent)
+    (hfs : isFiscalSustainable sys rich poor) :
+    socialWelfare sys rich poor ≤
+    (1 / 2) * (1 - sys.τ ^ 2) * (rich.ability ^ 2 + poor.ability ^ 2) := by
+  rw [socialWelfare_eq]
+  rw [fiscalSustainable_eq] at hfs
+  nlinarith [sys.τ_nonneg, sys.τ_lt_one, rich.ability_pos, poor.ability_pos,
+             sq_nonneg rich.ability, sq_nonneg poor.ability]
+
+/--
+  τ=0, G=0 の witness が W = (1/2)(Ar²+Ap²) を達成する
+-/
+lemma zero_tax_welfare (rich poor : Agent) :
+    let sys : InstitutionalDesign :=
+      { τ := 0, G := 0, τ_nonneg := le_refl 0,
+        τ_lt_one := by norm_num, G_nonneg := le_refl 0 }
+    socialWelfare sys rich poor =
+    (1 / 2) * (rich.ability ^ 2 + poor.ability ^ 2) := by
+  simp [socialWelfare_eq]
+
+/--
+  τ=0, G=0 は財政制約を満たす
+-/
+lemma zero_tax_sustainable (rich poor : Agent) :
+    let sys : InstitutionalDesign :=
+      { τ := 0, G := 0, τ_nonneg := le_refl 0,
+        τ_lt_one := by norm_num, G_nonneg := le_refl 0 }
+    isFiscalSustainable sys rich poor := by
+  simp [isFiscalSustainable, agentProduction, optimalEffort]
+
+/-! ## 主定理 -/
+
+/--
+  「最適経済制度の存在定理」
+
+  財政サステナブルであり、かつ社会的厚生（全体の幸福）を最大化する
+  『最適な税率 τ* と 給付 G* 』の組み合わせ（最適アーキテクチャ）が存在する。
+
+  **Witness**: τ=0, G=0
+  - これは「給付なし・課税なし」の状態で、インセンティブが完全に保存される。
+  - 財政制約は 0 ≥ 0 で自明に成立。
+  - 任意の sustainable な制度の厚生は W ≤ (1/2)(1-τ²)(Ar²+Ap²) ≤ (1/2)(Ar²+Ap²) を満たす。
+
+  **注意**: h_disparity は将来の一意性定理・Pareto改善定理への拡張用。
+-/
+theorem exists_optimal_institution
+    (rich poor : Agent)
+    (h_disparity : poor.ability < rich.ability) :
+    ∃ (best : InstitutionalDesign),
+      isFiscalSustainable best rich poor ∧
+      ∀ (other : InstitutionalDesign), isFiscalSustainable other rich poor →
+        socialWelfare other rich poor ≤ socialWelfare best rich poor := by
+  -- Witness: τ=0, G=0
+  let best : InstitutionalDesign :=
+    { τ := 0
+      G := 0
+      τ_nonneg := le_refl 0
+      τ_lt_one := by norm_num
+      G_nonneg := le_refl 0 }
+  refine ⟨best, ?_, ?_⟩
+  · -- isFiscalSustainable best
+    exact zero_tax_sustainable rich poor
+  · -- 最大性: ∀ other sustainable, W(other) ≤ W(best)
+    intro other hother
+    have h_best_welfare : socialWelfare best rich poor =
+        (1 / 2) * (rich.ability ^ 2 + poor.ability ^ 2) :=
+      zero_tax_welfare rich poor
+    rw [h_best_welfare]
+    have h_ub := welfare_upper_bound other rich poor hother
+    have h_tau_sq : other.τ ^ 2 ≥ 0 := sq_nonneg _
+    have h_sum_pos : rich.ability ^ 2 + poor.ability ^ 2 > 0 := by
+      positivity
+    nlinarith [other.τ_nonneg, other.τ_lt_one]
+
+end OptimalEconomy
