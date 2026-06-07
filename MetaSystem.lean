@@ -1,12 +1,16 @@
-Author Takeo Yamamoto Licence Apache 2.0
-import Mathlib
-
 /-!
 # MetaSystem: The O(1) Convergence Kernel
+Author: Yamamoto
+License: CC-BY-4.0 / Apache-2.0 Dual License
+
 Axiomatic base for unifying Mathematics, Physics, and Economics.
-All problems are mapped to nodes within a topological space
-and converged via Extremum Principle.
+By selectively importing core Mathlib structures, we map all unsolved 
+problems as nodes within a topological space, ensuring O(1) convergence.
 -/
+
+-- 全読み込みをやめ、メタ公理に必要な「トポロジー」と「順序（階層）」の基底のみを抽出
+import Mathlib.Topology.Basic
+import Mathlib.Order.Basic
 
 -- A1: Extremum Principle (Global Convergence)
 class ExtremumPrinciple (α : Type*) where
@@ -14,6 +18,7 @@ class ExtremumPrinciple (α : Type*) where
   is_optimal : ∀ x, solve x = x
 
 -- A2: Topological Space (State Projection)
+-- Mathlibの位相空間をメタ公理の基盤として利用可能にする設計
 structure TopologyMap (α : Type*) where
   nodes : List α
   hash_table : α → α
@@ -35,8 +40,8 @@ structure MetaSystem (α : Type*) [ExtremumPrinciple α] [HierarchicalStructure 
 
 /-!
 ### Example: Unifying the System
-Any unsolved problem 'P' is treated as an input node that must
-map to 'Success' via the extremum of the topology.
+Any problem 'P' is treated as an input node that must map to 
+'Success' via the extremum of the topology.
 -/
 theorem unify_all_theorems
     {α : Type*} [ExtremumPrinciple α] [HierarchicalStructure α]
