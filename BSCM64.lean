@@ -35,9 +35,10 @@ def bscm_control_exec (initial_state : Nat) : List Nat → Nat
 
 /-- δ は s > 1 のとき strictly reducing -/
 theorem bscm_delta_reduces (s : Nat) (h : s > 1) : bscm_delta s < s := by
-  dsimp [bscm_delta]
+  -- 修正①: dsimp → simp only。dsimp はif式のhead-normalizationを保証しない。
+  simp only [bscm_delta]
   split_ifs with h1
-  · -- 偶数: s / 2 < s  ①修正: Nat.div_lt_self を使用
+  · -- 偶数: s / 2 < s
     exact Nat.div_lt_self (by omega) (by omega)
   · -- 奇数: (s+1)/2 < s
     have : s % 2 = 1 := by omega
@@ -46,13 +47,15 @@ theorem bscm_delta_reduces (s : Nat) (h : s > 1) : bscm_delta s < s := by
 /-- δ は境界値 2^64-1 を保持する -/
 theorem bscm_state_bounded (s : Nat) (h : s ≤ 18446744073709551615) :
     bscm_delta s ≤ 18446744073709551615 := by
-  dsimp [bscm_delta]            -- ③修正: unfold → dsimp
+  -- 修正②: dsimp → simp only。同上の理由。
+  simp only [bscm_delta]
   split_ifs <;> omega
 
 /-- 制御ステップは常に境界内に収まる -/
 theorem bscm_control_robust (current_state : Nat) (external_input : Nat) :
     bscm_control_step current_state external_input ≤ 18446744073709551615 := by
-  dsimp [bscm_control_step]     -- ③修正: unfold → dsimp
+  -- 修正③: dsimp → simp only。let束縛 + % 演算を正しく展開するため。
+  simp only [bscm_control_step]
   apply bscm_state_bounded
   omega
 
@@ -61,11 +64,10 @@ theorem bscm_system_never_overflows
     (initial_state : Nat) (input : Nat) (inputs : List Nat) :
     bscm_control_exec (bscm_control_step initial_state input) inputs
       ≤ 18446744073709551615 := by
-  -- ②修正: generalize 迂回を廃止し直接帰納法
   induction inputs generalizing initial_state input with
   | nil        =>
-      dsimp [bscm_control_exec]
+      simp only [bscm_control_exec]
       exact bscm_control_robust initial_state input
   | cons head tail ih =>
-      dsimp [bscm_control_exec]
+      simp only [bscm_control_exec]
       exact ih (bscm_control_step initial_state input) head
