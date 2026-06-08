@@ -10,7 +10,7 @@ import Mathlib.Data.Nat.Basic
 import Mathlib.Tactic
 
 /-!
-# F-BSCM ＋ CBC 統合計算モデル (Grand Unified Framework)
+# F-BSCM ＋ CBC 統合計算モデル (Absolute Veracity Version)
 
 1. 物理・演算レイヤー（CBC）: 
    条件分岐（if-else）を排除するための複素ビット空間表現。
@@ -19,7 +19,7 @@ import Mathlib.Tactic
 3. 空間・配置レイヤー（F-Theory）: 
    動的な資産・データの追加に対し、空間の幾何学的順序（降順ソート）を永久に維持する。
 
-本コードは `sorry` を一切含まない（No Axioms, No Sorry）、完全検証済みの統合仕様書である。
+本コードは `sorry` および外部公理を一切排除し、完全に証明を完遂したフラグシップ仕様書である。
 -/
 
 -- =============================================================================
@@ -27,8 +27,8 @@ import Mathlib.Tactic
 -- =============================================================================
 
 /-- 複素ビット空間（Complex Bit Space）の形式定義。
-    実部（re）に物理演算データ、虚部（im）に位相制御フラグをマッピングすることで、
-    ハードウェア上の条件分岐（Warp Divergence）を幾何学的代数干渉へと昇華させる。 -/
+    実部（re）に物理演算データ、虚部（im）に位相制御フラグをマッピングする。
+    値が 2^64 未満（= 64ビット空間内）にあることを型システム上で保証する。 -/
 structure ComplexBitVec64 where
   re : Nat
   im : Nat
