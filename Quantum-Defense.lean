@@ -99,7 +99,8 @@ def bscm_δ (s : BitVec 64) : BitVec 64 :=
 /-- 【完全証明】境界保証：公理依存なし -/
 theorem bscm_δ_le_max (s : BitVec 64) :
     bscm_δ s ≤ 0xFFFFFFFFFFFFFFFF := by
-  simp [bscm_δ]; exact BitVec.le_max _
+  simp [bscm_δ]
+  decide
 
 /-- 量子耐性 PRNG -/
 def qprng (seed : BitVec 64) (ctr : Nat) : BitVec 64 :=
@@ -113,7 +114,8 @@ def qprng (seed : BitVec 64) (ctr : Nat) : BitVec 64 :=
 /-- 【完全証明】QPRNG 境界保証 -/
 theorem qprng_le_max (seed : BitVec 64) (ctr : Nat) :
     qprng seed ctr ≤ 0xFFFFFFFFFFFFFFFF := by
-  simp [qprng]; exact BitVec.le_max _
+  simp [qprng]
+  decide
 
 -- =============================================================================
 -- § 3. 鍵導出（完全証明層）
@@ -130,7 +132,8 @@ def qkdf (master salt : BitVec 64) (round : Nat) : BitVec 64 :=
 /-- 【完全証明】QKDF 境界保証 -/
 theorem qkdf_le_max (master salt : BitVec 64) (round : Nat) :
     qkdf master salt round ≤ 0xFFFFFFFFFFFFFFFF := by
-  simp [qkdf, bscm_δ]; exact BitVec.le_max _
+  simp [qkdf, bscm_δ]
+  decide
 
 /-- 【完全証明】ラウンド定数の非衝突性 -/
 theorem qkdf_round_const_distinct (r1 r2 : Nat) (h : r1 ≠ r2) :
@@ -138,7 +141,7 @@ theorem qkdf_round_const_distinct (r1 r2 : Nat) (h : r1 ≠ r2) :
     BitVec.ofNat 64 (r2 * 0x428A2F98D728AE22) := by
   intro heq
   apply h
-  have := BitVec.ofNat_inj (n := 64) |>.mp heq
+  have := BitVec.ofNat_eq_ofNat_iff.mp heq
   omega
 
 -- =============================================================================
@@ -166,7 +169,10 @@ private lemma qrinv_nil : QRingInv [] :=
   fun _ h => absurd h (List.not_mem_nil _)
 
 private lemma qrinv_singleton (k : QKeyEntry) : QRingInv [k] := by
-  intro e h; simp [List.mem_singleton] at h; subst h; simp [QRingInv]
+  intro e h
+  simp only [List.mem_singleton] at h
+  subst h
+  decide
 
 /-- 【完全証明】鍵挿入の不変条件保存 -/
 theorem qkey_insert_preserves
@@ -181,7 +187,7 @@ theorem qkey_insert_preserves
         intro e he
         simp only [List.mem_cons] at he
         rcases he with rfl | he_rest
-        · simp
+        · decide
         · exact le_trans
             (by have := h e (List.mem_cons_of_mem _ he_rest); simpa using this)
             h_ge
@@ -189,13 +195,14 @@ theorem qkey_insert_preserves
         intro e he
         simp only [List.mem_cons] at he
         rcases he with rfl | he_rec
-        · simp
+        · decide
         · push_neg at h_ge
           have h_tl : QRingInv tl := fun e' he' => by
             have := h e' (List.mem_cons_of_mem _ he'); simpa using this
           cases tl with
           | nil =>
-              simp [insert_qkey] at he_rec; subst he_rec
+              simp [insert_qkey] at he_rec
+              subst he_rec
               exact le_of_lt h_ge
           | cons hd' tl' =>
               have h_hd'_hd : hd'.entropy_weight ≤ hd.entropy_weight := by
@@ -282,7 +289,8 @@ def qencrypt_step
 /-- 【完全証明 T1】暗号化出力の境界保証 -/
 theorem T1_encrypt_bounded (eng : QEngine) (plain ext : BitVec 64) :
     (qencrypt_step eng plain ext).1 ≤ 0xFFFFFFFFFFFFFFFF := by
-  simp [qencrypt_step, bscm_δ]; exact BitVec.le_max _
+  simp [qencrypt_step, bscm_δ]
+  decide
 
 /-- 【完全証明 T2】鍵リング不変条件の永続性 -/
 theorem T2_ring_inv_persistent (eng : QEngine) (plain ext : BitVec 64) :
@@ -306,8 +314,8 @@ theorem T4_multi_bounded (eng : QEngine) (plain : BitVec 64)
     (qmulti_encrypt eng plain inputs).1 ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [qmulti_encrypt]
   induction inputs with
-  | nil  => exact BitVec.le_max _
-  | cons _ _ _ => exact BitVec.le_max _
+  | nil  => decide
+  | cons _ _ _ => decide
 
 /-- 【完全証明 T5】多層暗号化後のクエリ増加 -/
 theorem T5_multi_query_grows (eng : QEngine) (plain : BitVec 64)
@@ -327,16 +335,16 @@ theorem T6_qkdf_chain_bounded (seed salt : BitVec 64) (rounds : List Nat) :
     rounds.foldl (fun acc r => qkdf acc salt r) seed
       ≤ 0xFFFFFFFFFFFFFFFF := by
   induction rounds with
-  | nil  => exact BitVec.le_max _
-  | cons _ _ _ => exact BitVec.le_max _
+  | nil  => decide
+  | cons _ _ _ => decide
 
 /-- 【完全証明 T7】BSCM 境界の推移的保証 -/
 theorem T7_bscm_chain_bounded (s : BitVec 64) (steps : List BitVec 64) :
     steps.foldl (fun acc e => bscm_δ (acc + e)) s
       ≤ 0xFFFFFFFFFFFFFFFF := by
   induction steps with
-  | nil  => exact BitVec.le_max _
-  | cons _ _ _ => exact BitVec.le_max _
+  | nil  => decide
+  | cons _ _ _ => decide
 
 -- =============================================================================
 -- § 7. 公理依存定理群（依存関係を明示）
