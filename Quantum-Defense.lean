@@ -400,17 +400,6 @@ section AxiomAudit
 ```
 -/
 
--- 型チェックのみの確認
-#check @T1_encrypt_bounded
-#check @T2_ring_inv_persistent
-#check @T3_query_monotone
-#check @T4_multi_bounded
-#check @T5_multi_query_grows
-#check @T6_qkdf_chain_bounded
-#check @T7_bscm_chain_bounded
-#check @lwe_security_indistinguishable
-#check @grover_search_lower_bound
-
 end AxiomAudit
 
 -- =============================================================================
@@ -443,7 +432,7 @@ end AxiomAudit
 | Lean の扱い | 証明の穴（警告） | 明示的仮定（警告なし） |
 | 依存追跡 | #print axioms に現れる | #print axioms に現れる |
 | 意味 | 「後で埋める」 | 「これを前提とする」 |
-| 学術的誠実性 | 低い | 高い（仮定を明示） |
+| 学術的誠実�� | 低い | 高い（仮定を明示） |
 
 → sorry は axiom に変換することで学術的に正当化できる。
 
