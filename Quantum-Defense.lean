@@ -100,7 +100,7 @@ def bscm_δ (s : BitVec 64) : BitVec 64 :=
 theorem bscm_δ_le_max (s : BitVec 64) :
     bscm_δ s ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [bscm_δ]
-  decide
+  omega
 
 /-- 量子耐性 PRNG -/
 def qprng (seed : BitVec 64) (ctr : Nat) : BitVec 64 :=
@@ -115,7 +115,7 @@ def qprng (seed : BitVec 64) (ctr : Nat) : BitVec 64 :=
 theorem qprng_le_max (seed : BitVec 64) (ctr : Nat) :
     qprng seed ctr ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [qprng]
-  decide
+  omega
 
 -- =============================================================================
 -- § 3. 鍵導出（完全証明層）
@@ -133,7 +133,7 @@ def qkdf (master salt : BitVec 64) (round : Nat) : BitVec 64 :=
 theorem qkdf_le_max (master salt : BitVec 64) (round : Nat) :
     qkdf master salt round ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [qkdf, bscm_δ]
-  decide
+  omega
 
 /-- 【完全証明】ラウンド定数の非衝突性 -/
 theorem qkdf_round_const_distinct (r1 r2 : Nat) (h : r1 ≠ r2) :
@@ -218,7 +218,8 @@ theorem qkey_insert_preserves
                 · exact le_trans
                     (le_trans
                       (by have := h e (List.mem_cons_of_mem _
-                            (List.mem_cons_of_mem _ he_rest)); simpa using this)
+                            (List.mem_cons_of_mem _ he_rest))
+                          simpa using this)
                       h_hd'_hd)
                     (le_of_lt h_ge)
               · push_neg at h_ge'
@@ -290,7 +291,7 @@ def qencrypt_step
 theorem T1_encrypt_bounded (eng : QEngine) (plain ext : BitVec 64) :
     (qencrypt_step eng plain ext).1 ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [qencrypt_step, bscm_δ]
-  decide
+  omega
 
 /-- 【完全証明 T2】鍵リング不変条件の永続性 -/
 theorem T2_ring_inv_persistent (eng : QEngine) (plain ext : BitVec 64) :
@@ -314,8 +315,8 @@ theorem T4_multi_bounded (eng : QEngine) (plain : BitVec 64)
     (qmulti_encrypt eng plain inputs).1 ≤ 0xFFFFFFFFFFFFFFFF := by
   simp [qmulti_encrypt]
   induction inputs with
-  | nil  => decide
-  | cons _ _ _ => decide
+  | nil  => omega
+  | cons _ _ _ => omega
 
 /-- 【完全証明 T5】多層暗号化後のクエリ増加 -/
 theorem T5_multi_query_grows (eng : QEngine) (plain : BitVec 64)
@@ -335,16 +336,16 @@ theorem T6_qkdf_chain_bounded (seed salt : BitVec 64) (rounds : List Nat) :
     rounds.foldl (fun acc r => qkdf acc salt r) seed
       ≤ 0xFFFFFFFFFFFFFFFF := by
   induction rounds with
-  | nil  => decide
-  | cons _ _ _ => decide
+  | nil  => omega
+  | cons _ _ _ => omega
 
 /-- 【完全証明 T7】BSCM 境界の推移的保証 -/
 theorem T7_bscm_chain_bounded (s : BitVec 64) (steps : List BitVec 64) :
     steps.foldl (fun acc e => bscm_δ (acc + e)) s
       ≤ 0xFFFFFFFFFFFFFFFF := by
   induction steps with
-  | nil  => decide
-  | cons _ _ _ => decide
+  | nil  => omega
+  | cons _ _ _ => omega
 
 -- =============================================================================
 -- § 7. 公理依存定理群（依存関係を明示）
@@ -432,7 +433,7 @@ end AxiomAudit
 | Lean の扱い | 証明の穴（警告） | 明示的仮定（警告なし） |
 | 依存追跡 | #print axioms に現れる | #print axioms に現れる |
 | 意味 | 「後で埋める」 | 「これを前提とする」 |
-| 学術的誠実�� | 低い | 高い（仮定を明示） |
+| 学術的誠実度 | 低い | 高い（仮定を明示） |
 
 → sorry は axiom に変換することで学術的に正当化できる。
 
