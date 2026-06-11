@@ -1,6 +1,6 @@
 -- =============================================================================
 -- AGI Halting Condition Theory (Sorry-Free Edition)
--- AGI 自己停止条件の形式化：
+-- AGI 自己停止条件の形式化：証明完全版
 --
 -- Author: Takeo Yamamoto
 -- License: Apache-2.0
@@ -241,8 +241,8 @@ theorem T14_safe_agi_can_halt (agent : SafeAGI) :
 /-!
 ## 依存公理
 
-sorry : ゼロ
-axiom : ゼロ
+証明の穴 : ゼロ
+axiom   : ゼロ
 
 全定理は [propext, Classical.choice, Quot.sound] のみに依存。
 
