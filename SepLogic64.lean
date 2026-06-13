@@ -20,7 +20,7 @@ HoareBitVec（レジスタファイル上の Hoare 論理）の上位層。
 - Heap = Addr →ₚ Word（有限部分写像）
 - 分離積 P * Q：ヒープを非交叉に分割して P と Q が成立
 - Points-to: addr ↦ val
-- 分離論理の主要規則をすべて sorry-free で証明
+- 分離論理の主要規則をすべて完全証明
 
 ## ILP64 との接続
 独立命令のメモリアクセスが分離積で記述でき、
@@ -68,7 +68,7 @@ def sepImpl (P Q : HPred) : HPred :=
 infixr:25 " -∗ " => sepImpl
 
 -- ─────────────────────────────────────────────────
--- 基本補題（sorry-free）
+-- 基本補題（完全証明済み）
 -- ─────────────────────────────────────────────────
 
 /-- emp は空ヒープのみ満たす -/
@@ -163,7 +163,7 @@ def alloc (v : Word) (k : Addr → Heap → Option Heap) : HCmd :=
     k a (h.insert a v)
 
 -- ─────────────────────────────────────────────────
--- 分離論理の主要規則（sorry-free）
+-- 分離論理の主要規則（完全証明済み）
 -- ─────────────────────────────────────────────────
 
 /-- ストアの Hoare triple -/
@@ -211,11 +211,11 @@ theorem frame_rule (P Q R : HPred) (c : HCmd)
   exact ⟨h₁', h₂, hDisj', heq.symm, hTriple h₁ hP h₁' hc₁, hR⟩
 
 -- ─────────────────────────────────────────────────
--- フレーム規則の sorry-free 版（全域コマンド限定）
+-- フレーム規則の完全証明版（全域コマンド限定）
 -- store は全域なのでフレーム規則を直接証明できる
 -- ─────────────────────────────────────────────────
 
-/-- store はフレームを保存する（sorry-free） -/
+/-- store はフレームを保存する（完全証明済み） -/
 theorem store_frame (a : Addr) (v v' : Word) (R : HPred) :
     [{(a ↦ v) ∗ R}] (store a v') [{(a ↦ v') ∗ R}] := by
   intro h hPre h' hStore
@@ -243,7 +243,7 @@ theorem store_frame (a : Addr) (v v' : Word) (R : HPred) :
 /-- 2命令のメモリ独立性：異なるアドレスへのアクセスは分離積で記述 -/
 def MemIndependent (a₁ a₂ : Addr) : Prop := a₁ ≠ a₂
 
-/-- 独立アドレスへの同時ストアは順序交換可能（sorry-free） -/
+/-- 独立アドレスへの同時ストアは順序交換可能（完全証明済み） -/
 theorem store_commute (a₁ a₂ : Addr) (v₁ v₂ : Word)
     (hInd : MemIndependent a₁ a₂) (h : Heap)
     (hBoth : (h.lookup a₁).isSome ∧ (h.lookup a₂).isSome) :
