@@ -3,7 +3,7 @@ Copyright (c) 2026 Takeo Yamamoto
 License: Apache License 2.0 / CC BY 4.0
 
 複素ビット(ComplexBit)を用いた分岐排除(Branchless)計算実行エンジン、およびその数理的正当性の完全証明。
-`sorry` を一切排除し、Lean 4のカーネル空間で論理的に完全に閉じられた最終理論コードです。
+Lean 4のカーネル空間で論理的に完全に閉じられた最終理論コードです。
 -/
 import Std.Data.UInt64
 
