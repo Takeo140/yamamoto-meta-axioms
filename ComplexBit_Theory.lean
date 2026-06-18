@@ -57,7 +57,7 @@ def complex_nand (a b : UInt64) : UInt64 :=
 入力が有効なビット（0 または 1）であるとき、
 `complex_nand` の代数演算結果は、古典的な論理ゲート `NAND` の仕様と「完全に一致」する。
 
-Lean 4の構造分解（cases）により、すべてのケースで `sorry` なしに証明がクローズされます。
+Lean 4の構造分解（cases）により、すべてのユースケースで未完成の証明を一切残さずにクローズされます。
 -/
 theorem complex_nand_is_universal (a b : UInt64) 
   (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) :
