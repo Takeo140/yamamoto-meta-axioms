@@ -1,5 +1,5 @@
 -- Author: Takeo Yamamoto
--- License: CC BY 4.0
+-- License: CC BY 4.0 Apache 2.0
 import Mathlib.Data.Nat.Basic
 
 /-!
