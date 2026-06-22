@@ -1,0 +1,105 @@
+/-
+Copyright (c) 2026 Takeo Yamamoto
+Released under the Apache 2.0 / CC BY 4.0
+-/
+
+import Std.Data.UInt64
+
+/-!
+# 実行特化型 64-bit 複素行列演算エンジン (High-Speed Execution Artifact)
+関数ベースの行列定義や再帰処理によるヒープ割り当てを完全にパージし、
+C言語のフラットな連続メモリ（1次元配列）とネイティブループに展開されるよう最適化。
+-/
+
+-- ============================================================
+-- 1. Hardware Aligned Structures (ハードウェアレジスタ直結構造体)
+-- ============================================================
+
+/--
+`BitVec 64` は証明には便利ですが、実行速度を極限まで高めるため、
+Cバックエンドで確実に `uint64_t` レジスタへ直接マッピングされる `UInt64` を採用します。
+メモリ上では隙間のない 128 bit (64+64) のブロックとして扱われます。
+-/
+structure BinComplex64 where
+  re : UInt64
+  im : UInt64
+  deriving Inhabited, Repr, BEq
+
+@[inline]
+def binComplexZero64 : BinComplex64 :=
+  ⟨0, 0⟩
+
+-- ============================================================
+-- 2 & 3. Branchless Core Logic (完全分岐排除・算術演算コア)
+-- ============================================================
+-- @[inline] を付与することで、関数呼び出しのオーバーヘッドを消去し、
+-- コンパイル時に呼び出し元のループ内へ直接インライン展開させます。
+
+@[inline]
+def binComplexAdd64 (a b : BinComplex64) : BinComplex64 :=
+  ⟨a.re + b.re, a.im + b.im⟩
+
+@[inline]
+def binComplexMul64 (a b : BinComplex64) : BinComplex64 :=
+  ⟨a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re⟩
+
+-- ============================================================
+-- 4. Flat Memory Matrix (GPU/シストリック・アレイ対応 フラットメモリ行列)
+-- ============================================================
+
+/-- 
+関数 (Fin n → Fin m → 要素) ではなく、連続したメモリブロック (Array) を使用します。
+これにより、CPU/GPUのキャッシュラインに乗りやすくなり、メモリアクセス速度が劇的に向上します。
+-/
+structure BinMatrix64 where
+  rows : Nat
+  cols : Nat
+  data : Array BinComplex64
+
+/-- 1次元フラット配列から2次元インデックス (i, j) の要素を抽出 -/
+@[inline]
+def BinMatrix64.get (M : BinMatrix64) (i j : Nat) : BinComplex64 :=
+  -- 境界外アクセスのパニックを防ぎつつ、Cの配列アクセスに最適化
+  if h : i * M.cols + j < M.data.size then
+    M.data[i * M.cols + j]
+  else
+    binComplexZero64
+
+-- ============================================================
+-- 6. High-End Matrix Multiplication (ネイティブループ・ハイエンド複素行列積)
+-- ============================================================
+
+/-- 
+再帰関数 (sumHelper64) を廃止し、Lean 4の `Id.run` とミュータブル変数 (`mut`) を活用。
+コンパイル時には C/C++ の純粋な `for` ループへと変換され、真のハードウェア性能を引き出します。
+-/
+@[export bin_matrix_mul_64_c]
+def binMatrixMul64 (A B : BinMatrix64) : BinMatrix64 :=
+  if A.cols != B.rows then
+    -- 次元不適合のフォールバック
+    ⟨0, 0, #[]⟩
+  else
+    let n := A.rows
+    let m := A.cols
+    let p := B.cols
+    
+    -- 結果を格納するフラット配列を事前に一括確保 (Cの malloc / calloc に相当)
+    let capacity := n * p
+    let mut outData : Array BinComplex64 := mkArray capacity binComplexZero64
+
+    -- Id.run ブロック内のループは、副作用のない純粋関数として扱われながら、
+    -- 内部的にはC言語の破壊的代入による高速なループにコンパイルされます。
+    Id.run do
+      for i in [0:n] do
+        for j in [0:p] do
+          let mut sum := binComplexZero64
+          for k in [0:m] do
+            let a_val := A.get i k
+            let b_val := B.get k j
+            -- 分岐なしの積和演算 (MAC: Multiply-Accumulate) を実行
+            sum := binComplexAdd64 sum (binComplexMul64 a_val b_val)
+          
+          -- 計算結果を書き込み
+          outData := outData.set! (i * p + j) sum
+          
+      return ⟨n, p, outData⟩
