@@ -1,4 +1,4 @@
-Lisense Apache 2.0 Takeo Yamamoto
+License Apache 2.0 Takeo Yamamoto
 /-!
 # ComplexQuantum Phase Space Simulator
 # 連続位相空間における量子ビット演算ライブラリ
