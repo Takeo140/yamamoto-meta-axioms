@@ -1,0 +1,19 @@
+[package]
+name    = "ftheory-gpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytemuck = { version = "=1.14.0", features = ["derive"] }
+
+[[bin]]
+name = "ftheory_gpu"
+path = "src/main.rs"
+
+[lib]
+name = "ftheory"
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto       = true
