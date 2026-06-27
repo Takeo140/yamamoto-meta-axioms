@@ -12,7 +12,7 @@
 ## 証明戦略
 - 有理係数 CMat22 で純代数的に証明（ring タクティク）
 - Float Gate2x2 は数値検証（approxEq）で補完
-- sorry なし
+- 全証明完結（公理不使用）
 -/
 
 import Mathlib
