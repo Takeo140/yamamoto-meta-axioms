@@ -1,6 +1,6 @@
 # Yamamoto Meta-Axioms (F-Theory)
 
-[![CI Status](https://github.com/Takeo140/yamamoto-meta-axioms/actions/workflows/gate.yml/badge.svg)](https://github.com/Takeo140/yamamoto-meta-axioms/actions)
+[![CI](https://github.com/Takeo140/yamamoto-meta-axioms/actions/workflows/ci.yml/badge.svg)](https://github.com/Takeo140/yamamoto-meta-axioms/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.18979507-blue)](https://doi.org/10.5281/zenodo.18979507)
 
