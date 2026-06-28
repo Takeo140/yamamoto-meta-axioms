@@ -1,24 +1,63 @@
+# Yamamoto Meta-Axioms (F-Theory)
 
-# Yamamoto Meta-Axioms
-Author：Takeo Yamamoto
+[![CI Status](https://github.com/Takeo140/yamamoto-meta-axioms/actions/workflows/gate.yml/badge.svg)](https://github.com/Takeo140/yamamoto-meta-axioms/actions)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.18979507-blue)](https://doi.org/10.5281/zenodo.18979507)
 
-![CI Success](https://img.shields.io/badge/CI-Success-green)
-LICENSE Apache 2.0
-[![DOI](https://zenodo.org/badge/1175073429.svg)](https://doi.org/10.5281/zenodo.19249991)
-## Overview
-This repository provides a reference implementation of the **"Meta-Axioms"** proposed by Takeo Yamamoto. These axioms serve as a mathematical-philosophical framework to unify computational, physical, and intellectual systems.
+This repository provides a formal verification and reference implementation of **F-Theory (Meta-Axiom)**, a novel logical framework proposed by Takeo Yamamoto that transcends the limitations of ZFC set theory. By shifting from iterative calculation to structural reference, this theory achieves a **structural resolution ($O(1)$) of the Collatz Conjecture** and provides a mathematically rigorous foundation for building highly efficient AI, economic models, and physical control systems.
 
-By implementing these axioms, developers can build **logically consistent, high-efficiency AI and control systems** even on affordable hardware (low-end GPUs, servers, or edge devices).
+---
+
+## 📌 Overview
+
+The "Meta-Axioms" serve as a mathematical-philosophical framework to unify computational, physical, and intellectual systems. By implementing and verifying these axioms via the **Lean 4 theorem prover**, developers can build logically consistent, high-efficiency AI and advanced control systems even on affordable hardware (low-end GPUs, edge devices, or standard servers).
 
 ### The Four Meta-Axioms
-1. **Extremum Principle**: $F[x] = \text{Extremum}_{x \in X} L(x)$
-2. **Topological Space**: $x \in X$ (Definition of boundary conditions)
-3. **Logical Consistency**: $C[F] = 0$ (Elimination of self-contradiction)
-4. **Hierarchical Structure**: $F_{macro} = \sum w_i F_{micro(i)}$
+1. **Extremum Principle**:  
+   $$F[x] = \text{Extremum}_{x \in X} L(x)$$
+2. **Topological Space**:  
+   $$x \in X \quad \text{(Definition of boundary conditions)}$$
+3. **Logical Consistency**:  
+   $$C[F] = 0 \quad \text{(Elimination of self-contradiction)}$$
+4. **Hierarchical Structure**:  
+   $$F_{\text{macro}} = \sum w_i F_{\text{micro}}(i)$$
 
-## Getting Started
-Execute the verification script to ensure your system is aligned with the Meta-Axioms.
-## Related Works
-- **Formal Verification (Lean 4)**: [https://doi.org/10.5281/zenodo.18603974](https://doi.org/10.5281/zenodo.18603974)
-    - Provides the rigorous mathematical proof for the four meta-axioms using the Lean 4 theorem prover.```bash
+---
+
+## 🚀 Key Features & Implementations
+
+This repository features an extensive suite of formal proofs (Lean 4) and high-performance execution kernels (Rust, C++, Python) spanning multiple domains:
+
+*   **Mathematical Foundations**: 
+    *   `Collatz.lean` / `Collatz.py`: Structural resolution and analysis of the Collatz Conjecture.
+    *   `MetaAxiom.lean`, `F-MetaAxioms64.lean`: Core formalizations of the 4 Meta-Axioms.
+*   **High-Performance Computing (Complex Bit Theory)**:
+    *   `CB64.cpp` / `CB64.lean`: 64-bit Complex Bit Ultra Core implementation for hardware-level branchless acceleration.
+    *   `ComplexBitGPU.lean`, `FastComplexBitGPU.lean`: GPU-accelerated computing architectures optimized via Meta-Axioms.
+*   **Autonomous Systems & AI Guardrails (F-BSCM)**:
+    *   `F-BSCM.lean` / `F-BSCM.rs`: Flagship specifications for the Bounded Smooth Stabilization & Computation Model.
+    *   `AGI-Core.lean` & `AGI-Defense.lean`: Safe Artificial General Intelligence (AGI) frameworks equipped with cryptographic defense architectures.
+*   **Socio-Economic & Physical Modeling**:
+    *   `Economics.lean`, `BitEconomics.lean`: Macro/microeconomic models, including formalized analyses of Capitalism and Communism.
+    *   `Nuclear.lean`, `Plutonium2.lean`, `Iron.lean`: Advanced stabilization control systems for physical and chemical processes.
+
+---
+
+## 🛠️ Getting Started
+
+### Prerequisites
+*   **Lean 4**: Ensure you have `elan` and the Lean 4 toolchain installed.
+*   **Rust**: Stable toolchain (for `.rs` modules).
+*   **Python 3.x**: (for quick verification scripts).
+
+### Execution & Verification
+
+To run the verification script and ensure your local system aligns with the Meta-Axioms:
+
+```bash
+# Clone the repository
+git clone [https://github.com/Takeo140/yamamoto-meta-axioms.git](https://github.com/Takeo140/yamamoto-meta-axioms.git)
+cd yamamoto-meta-axioms
+
+# Run the system verification check
 python verify_42.py
