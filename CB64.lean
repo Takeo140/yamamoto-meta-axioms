@@ -17,7 +17,7 @@ abbrev U64 := BitVec 64
 namespace U64Lemmas
 
 /--
-【補題 1.1】非ゼロ U64 に対するビットトリック  
+【補題 1.1】非ゼロ U64 に対するビットトリック
 `x ≠ 0` ならば `((-x) ||| x) >>> 63 = 1`
 -/
 theorem neg_or_self_msb (x : U64) (hx : x ≠ 0) :
@@ -45,6 +45,7 @@ end U64Lemmas
   (-x ||| x) >>> 63
 
 @[simp] theorem nonzeroMask_zero : nonzeroMask (0 : U64) = 0 := by
+  simp [nonzeroMask]
   bv_decide
 
 /-- 非ゼロならマスクは 1 になる -/
@@ -66,10 +67,9 @@ theorem branchlessSelect_correct (control a b : U64) :
   simp only [branchlessSelect]
   by_cases h : control = 0
   · subst h
-    have : nonzeroMask 0 = 0 := by simp [nonzeroMask_zero]
-    simp [this]
-  · have : nonzeroMask control = 1 := nonzeroMask_nonzero control h
-    simp [h, this]
+    simp [nonzeroMask_zero]
+  · have hm : nonzeroMask control = 1 := nonzeroMask_nonzero control h
+    simp [h, hm]
 
 /-! # §2. ComplexBit：代数構造付き複素数ビット型 -/
 
@@ -122,7 +122,8 @@ def ofImag (y : U64) : ComplexBit :=
   { real := c.real, imag := -c.imag }
 
 @[simp] theorem conj_conj (c : ComplexBit) : conj (conj c) = c := by
-  simp [conj, neg]
+  simp only [conj, neg]
+  constructor <;> simp [BitVec.neg_neg]
 
 /-- 90度回転（`i` を掛けるのに対応） -/
 @[inline] def rotate90 (c : ComplexBit) : ComplexBit :=
@@ -130,15 +131,14 @@ def ofImag (y : U64) : ComplexBit :=
 
 /-- `I² = -1`（虚数単位の定義的性質） -/
 theorem I_sq : I * I = -1 := by
-  rfl
+  simp only [I, mul, one, neg, HMul.hMul, Mul.mul]
+  constructor <;> bv_decide
 
 /-- 90度回転を 4 回繰り返すと元に戻る -/
 theorem rotate90_four_eq_id (c : ComplexBit) :
     c.rotate90.rotate90.rotate90.rotate90 = c := by
-  simp [rotate90]
-  -- BitVec の二重否定除去
-  have neg_neg (x : U64) : -(-x) = x := by bv_decide
-  constructor <;> rw [neg_neg]
+  simp only [rotate90, neg]
+  constructor <;> simp [BitVec.neg_neg]
 
 end ComplexBit
 
@@ -158,6 +158,11 @@ def one  : QuatBit := { w := 1, x := 0, y := 0, z := 0 }
 instance : Zero QuatBit := ⟨zero⟩
 instance : One  QuatBit := ⟨one⟩
 
+/-- 符号反転（`ji_eq_neg_k` で必要） -/
+@[inline] def neg (q : QuatBit) : QuatBit :=
+  { w := -q.w, x := -q.x, y := -q.y, z := -q.z }
+instance : Neg QuatBit := ⟨neg⟩
+
 /-- Hamilton 積（オーバーフロー込み四元数積） -/
 @[inline] def mul (q1 q2 : QuatBit) : QuatBit :=
   { w := q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z
@@ -176,6 +181,15 @@ theorem ij_eq_k : unitI * unitJ = unitK := by rfl
 
 /-- `j * i = -k`（非可換性の例） -/
 theorem ji_eq_neg_k : unitJ * unitI = -unitK := by rfl
+
+/-- `i² = -1` -/
+theorem unitI_sq : unitI * unitI = -one := by rfl
+
+/-- `j² = -1` -/
+theorem unitJ_sq : unitJ * unitJ = -one := by rfl
+
+/-- `k² = -1` -/
+theorem unitK_sq : unitK * unitK = -one := by rfl
 
 end QuatBit
 
@@ -229,20 +243,38 @@ def bscmStepCB (s : BSCMStateCB) : Option BSCMStateCB :=
 /-- BSCM のステップ数に関する有界性定理 -/
 theorem bscmStepCB_step_bounded (s : BSCMStateCB) :
     match bscmStepCB s with
-    | none   => s.step ≥ s.bound
+    | none    => s.step ≥ s.bound
     | some s' => s'.step = s.step + 1 := by
-  simp [bscmStepCB]
+  simp only [bscmStepCB]
   split_ifs with h
-  · rfl
+  · exact h
   · simp
 
-/-! # §6. 簡単な動作確認用 example -/
+/-- バウンドを超えたら `none` を返すことの直接証明 -/
+theorem bscmStepCB_none_iff (s : BSCMStateCB) :
+    bscmStepCB s = none ↔ s.step ≥ s.bound := by
+  simp [bscmStepCB]
+  split_ifs with h
+  · simp [h]
+  · simp [h]
 
+/-! # §6. 動作確認用 example -/
+
+-- branchlessSelect の基本動作
 example : branchlessSelect (1 : U64) (10 : U64) (20 : U64) = 10 := by
-  have : nonzeroMask (1 : U64) = 1 := nonzeroMask_nonzero 1 (by decide)
-  simp [branchlessSelect, nonzeroMask, this]
+  have hm : nonzeroMask (1 : U64) = 1 := nonzeroMask_nonzero 1 (by decide)
+  simp [branchlessSelect, hm]
 
+example : branchlessSelect (0 : U64) (10 : U64) (20 : U64) = 20 := by
+  simp [branchlessSelect, nonzeroMask_zero]
+
+-- conj の involution
 example (c : ComplexBit) :
-    ComplexBit.conj (ComplexBit.conj c) = c := by
-  simp [ComplexBit.conj, ComplexBit.neg]
+    ComplexBit.conj (ComplexBit.conj c) = c :=
+  ComplexBit.conj_conj c
+
+-- rotate90 の 4 周期性
+example (c : ComplexBit) :
+    c.rotate90.rotate90.rotate90.rotate90 = c :=
+  ComplexBit.rotate90_four_eq_id c
 
