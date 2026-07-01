@@ -204,7 +204,7 @@ struct BSCMResult {
 #include <chrono>
 #include <iomanip>
 
-// 性能評価用の構造体
+// 性能評価用の構造体（今回はちゃんと使う）
 struct BenchmarkResult {
     U64 start_val;
     U64 steps;
@@ -212,49 +212,72 @@ struct BenchmarkResult {
     double duration_ns;
 };
 
+// 算術オーバーフロー検知（3n+1 が wrap したか）
+HD_INLINE bool collatzOverflow(U64 n) {
+    U64 odd = n & 1ULL;
+    if (!odd) return false;
+    U64 next = 3ULL * n + 1ULL;
+    return next < n;
+}
+
 // 性能評価用メイン関数
 int main() {
-    // 性能測定用入力セット（小規模～極大値まで）
-    std::vector<U64> test_inputs = {6, 27, 100, 0x123456789ABCDEF0ULL, 0xFFFFFFFFFFFFFFFFULL};
-    
-    std::cout << "--- Bounded Smooth Collatz Machine: Performance Benchmark ---" << std::endl;
-    std::cout << "Input,Steps,Overflows,Time_ns" << std::endl;
+    // 簡単な自己テスト
+    if (!example_branchlessSelect()) {
+        std::cerr << "example_branchlessSelect FAILED\n";
+        return 1;
+    }
+    {
+        ComplexBit c{42, 7};
+        if (!example_conj_conj(c)) {
+            std::cerr << "example_conj_conj FAILED\n";
+            return 1;
+        }
+    }
+
+    // 性能測定用入力セット
+    std::vector<U64> test_inputs = {
+        6,
+        27,
+        100,
+        0x123456789ABCDEF0ULL,
+        0xFFFFFFFFFFFFFFFFULL
+    };
+
+    std::cout << "--- Bounded Smooth Collatz Machine: Performance Benchmark ---\n";
+    std::cout << "Input,Steps,Overflows,Time_ns\n";
 
     for (U64 start_val : test_inputs) {
-        BSCMStateCB state{ complexOfReal(start_val), 1000000, 0 }; // ステップ制限を拡大
+        BSCMStateCB state{ complexOfReal(start_val), 1000000, 0 }; // ステップ上限
         U64 overflow_count = 0;
-        U64 prev_n = start_val;
 
-        // 計測開始
         auto start_time = std::chrono::high_resolution_clock::now();
-        
-        for (U64 i = 0; i < state.bound; ++i) {
-            BSCMResult res = bscmStepCB(state);
-            U64 current_n = res.data.state.real;
 
-            // オーバーフロー検知
-            bool is_odd = (prev_n & 1ULL);
-            if ((is_odd && (current_n <= prev_n)) || (!is_odd && (current_n > prev_n))) {
+        U64 prev_n = start_val;
+        for (U64 i = 0; i < state.bound; ++i) {
+            if (collatzOverflow(prev_n)) {
                 overflow_count++;
             }
+
+            BSCMResult res = bscmStepCB(state);
+            U64 current_n = res.data.state.real;
 
             if (current_n == 1ULL || !res.valid) {
                 state = res.data;
                 break;
             }
+
             state = res.data;
             prev_n = current_n;
         }
 
-        // 計測終了
         auto end_time = std::chrono::high_resolution_clock::now();
         double duration = std::chrono::duration<double, std::nano>(end_time - start_time).count();
 
-        // 結果出力（CSV形式）
-        std::cout << start_val << "," 
-                  << state.step << "," 
-                  << overflow_count << "," 
-                  << duration << std::endl;
+        std::cout << start_val << ","
+                  << state.step << ","
+                  << overflow_count << ","
+                  << duration << "\n";
     }
 
     return 0;
