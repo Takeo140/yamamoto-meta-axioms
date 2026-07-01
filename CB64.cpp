@@ -201,65 +201,60 @@ struct BSCMResult {
 
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <iomanip>
 
+// 性能評価用の構造体
+struct BenchmarkResult {
+    U64 start_val;
+    U64 steps;
+    U64 overflow_count;
+    double duration_ns;
+};
+
+// 性能評価用メイン関数
 int main() {
-    // GPUの大規模並列（バルク処理）を模したテストデータの準備
-    // 様々な初期値（偶数、奇数、大きな数）を並列処理する想定
-    std::vector<U64> test_inputs = {
-        6, 11, 27, 100, 
-        0xFFFFFFFFFFFFFFFFULL,          // 最初から最大値（即座にオーバーフローするケース）
-        0x5555555555555555ULL           // ビットパターンが詰まった大きな奇数
-    };
-
-    std::cout << "=== Bounded Smooth Collatz Machine: Performance & Overflow Test ===" << std::endl;
+    // 性能測定用入力セット（小規模～極大値まで）
+    std::vector<U64> test_inputs = {6, 27, 100, 0x123456789ABCDEF0ULL, 0xFFFFFFFFFFFFFFFFULL};
+    
+    std::cout << "--- Bounded Smooth Collatz Machine: Performance Benchmark ---" << std::endl;
+    std::cout << "Input,Steps,Overflows,Time_ns" << std::endl;
 
     for (U64 start_val : test_inputs) {
-        // 初期状態の設定（上限100ステップ）
-        BSCMStateCB state{ complexOfReal(start_val), 100, 0 };
-        
+        BSCMStateCB state{ complexOfReal(start_val), 1000000, 0 }; // ステップ制限を拡大
         U64 overflow_count = 0;
         U64 prev_n = start_val;
-        bool completed = false;
 
-        std::cout << "\n[Testing Initial Value: " << start_val << "]" << std::endl;
-
-        // 指定ステップまでループを回す（ベンチマーク用の擬似カーネルループ）
+        // 計測開始
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
         for (U64 i = 0; i < state.bound; ++i) {
             BSCMResult res = bscmStepCB(state);
-            
-            if (!res.valid) {
-                completed = true;
-                break;
-            }
-
             U64 current_n = res.data.state.real;
 
-            // --- 発散（オーバーフロー）の検知ロジック ---
-            // 奇数処理 (3n+1) の結果が元の数より小さくなっている、
-            // または偶数処理 (n/2) なのに数値が跳ね上がっている場合はラップアラウンドが発生している
+            // オーバーフロー検知
             bool is_odd = (prev_n & 1ULL);
             if ((is_odd && (current_n <= prev_n)) || (!is_odd && (current_n > prev_n))) {
                 overflow_count++;
             }
 
-            // コラッツの標準的な終了条件（1への到達）
-            if (current_n == 1ULL) {
+            if (current_n == 1ULL || !res.valid) {
                 state = res.data;
-                completed = true;
                 break;
             }
-
-            // 次のステップへ状態を更新
             state = res.data;
             prev_n = current_n;
         }
 
-        // 結果の出力（性能評価と発散の可視化）
-        std::cout << "-> Final State (Real) : " << state.state.real << std::endl;
-        std::cout << "-> Total Steps Taken  : " << state.step << std::endl;
-        std::cout << "-> Overflow Detects   : " << overflow_count 
-                  << " times (Modulo 2^64 Wrap-around)" << std::endl;
-        std::cout << "-> Status             : " << (state.state.real == 1ULL ? "Reached 1 (Success)" : "Bound Exceeded/Diverged") << std::endl;
+        // 計測終了
+        auto end_time = std::chrono::high_resolution_clock::now();
+        double duration = std::chrono::duration<double, std::nano>(end_time - start_time).count();
+
+        // 結果出力（CSV形式）
+        std::cout << start_val << "," 
+                  << state.step << "," 
+                  << overflow_count << "," 
+                  << duration << std::endl;
     }
 
     return 0;
