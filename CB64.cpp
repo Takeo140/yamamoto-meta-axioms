@@ -200,28 +200,66 @@ struct BSCMResult {
 }
 
 #include <iostream>
+#include <vector>
 
 int main() {
-    // 1. 分岐排除選択のテスト (control=1 なので 10 が選ばれるはず)
-    U64 selected = branchlessSelect(1ULL, 10ULL, 20ULL);
-    std::cout << "Selected (expected 10): " << selected << std::endl;
+    // GPUの大規模並列（バルク処理）を模したテストデータの準備
+    // 様々な初期値（偶数、奇数、大きな数）を並列処理する想定
+    std::vector<U64> test_inputs = {
+        6, 11, 27, 100, 
+        0xFFFFFFFFFFFFFFFFULL,          // 最初から最大値（即座にオーバーフローするケース）
+        0x5555555555555555ULL           // ビットパターンが詰まった大きな奇数
+    };
 
-    // 2. 複素数ビットの乗算テスト (I * I = -1 + 0I)
-    ComplexBit cb_I{0, 1};
-    ComplexBit cb_result = cb_I * cb_I;
-    
-    // U64のアンダーフローにより、-1 は 18446744073709551615 になります
-    std::cout << "I * I = Real: " << cb_result.real 
-              << ", Imag: " << cb_result.imag << std::endl;
+    std::cout << "=== Bounded Smooth Collatz Machine: Performance & Overflow Test ===" << std::endl;
 
-    // 3. Collatzマシン (BSCM) を1ステップ動かす
-    BSCMStateCB initial_state{ ComplexBit{6, 0}, 10, 0 }; // 初期値6、上限10ステップ
-    BSCMResult bscm_res = bscmStepCB(initial_state);
+    for (U64 start_val : test_inputs) {
+        // 初期状態の設定（上限100ステップ）
+        BSCMStateCB state{ complexOfReal(start_val), 100, 0 };
+        
+        U64 overflow_count = 0;
+        U64 prev_n = start_val;
+        bool completed = false;
 
-    if (bscm_res.valid) {
-        // 6は偶数なので 6 >> 1 = 3 になる
-        std::cout << "BSCM Next State (expected 3): " << bscm_res.data.state.real << std::endl;
-        std::cout << "BSCM Next Step  (expected 1): " << bscm_res.data.step << std::endl;
+        std::cout << "\n[Testing Initial Value: " << start_val << "]" << std::endl;
+
+        // 指定ステップまでループを回す（ベンチマーク用の擬似カーネルループ）
+        for (U64 i = 0; i < state.bound; ++i) {
+            BSCMResult res = bscmStepCB(state);
+            
+            if (!res.valid) {
+                completed = true;
+                break;
+            }
+
+            U64 current_n = res.data.state.real;
+
+            // --- 発散（オーバーフロー）の検知ロジック ---
+            // 奇数処理 (3n+1) の結果が元の数より小さくなっている、
+            // または偶数処理 (n/2) なのに数値が跳ね上がっている場合はラップアラウンドが発生している
+            bool is_odd = (prev_n & 1ULL);
+            if ((is_odd && (current_n <= prev_n)) || (!is_odd && (current_n > prev_n))) {
+                overflow_count++;
+            }
+
+            // コラッツの標準的な終了条件（1への到達）
+            if (current_n == 1ULL) {
+                state = res.data;
+                completed = true;
+                break;
+            }
+
+            // 次のステップへ状態を更新
+            state = res.data;
+            prev_n = current_n;
+        }
+
+        // 結果の出力（性能評価と発散の可視化）
+        std::cout << "-> Final State (Real) : " << state.state.real << std::endl;
+        std::cout << "-> Total Steps Taken  : " << state.step << std::endl;
+        std::cout << "-> Overflow Detects   : " << overflow_count 
+                  << " times (Modulo 2^64 Wrap-around)" << std::endl;
+        std::cout << "-> Status             : " << (state.state.real == 1ULL ? "Reached 1 (Success)" : "Bound Exceeded/Diverged") << std::endl;
     }
 
     return 0;
