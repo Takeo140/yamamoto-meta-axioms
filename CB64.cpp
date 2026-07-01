@@ -198,3 +198,31 @@ struct BSCMResult {
     ComplexBit cc = complexConj(complexConj(c));
     return (cc.real == c.real && cc.imag == c.imag);
 }
+
+#include <iostream>
+
+int main() {
+    // 1. 分岐排除選択のテスト (control=1 なので 10 が選ばれるはず)
+    U64 selected = branchlessSelect(1ULL, 10ULL, 20ULL);
+    std::cout << "Selected (expected 10): " << selected << std::endl;
+
+    // 2. 複素数ビットの乗算テスト (I * I = -1 + 0I)
+    ComplexBit cb_I{0, 1};
+    ComplexBit cb_result = cb_I * cb_I;
+    
+    // U64のアンダーフローにより、-1 は 18446744073709551615 になります
+    std::cout << "I * I = Real: " << cb_result.real 
+              << ", Imag: " << cb_result.imag << std::endl;
+
+    // 3. Collatzマシン (BSCM) を1ステップ動かす
+    BSCMStateCB initial_state{ ComplexBit{6, 0}, 10, 0 }; // 初期値6、上限10ステップ
+    BSCMResult bscm_res = bscmStepCB(initial_state);
+
+    if (bscm_res.valid) {
+        // 6は偶数なので 6 >> 1 = 3 になる
+        std::cout << "BSCM Next State (expected 3): " << bscm_res.data.state.real << std::endl;
+        std::cout << "BSCM Next Step  (expected 1): " << bscm_res.data.step << std::endl;
+    }
+
+    return 0;
+}
