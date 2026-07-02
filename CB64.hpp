@@ -203,3 +203,35 @@ inline U64 bscmControlExec(U64 initialState, const std::vector<U64>& inputs) {
 
 static_assert(branchlessSelect(1, 10, 20) == 10);
 static_assert(branchlessSelect(0, 10, 20) == 20);
+#include <iostream>
+#include "ultra_core.hpp"   // ← Takeo のファイル名に合わせて変更
+
+int main() {
+    // --- ComplexBit の最小動作確認 ---
+    ComplexBit a{3, 5};
+    ComplexBit b{2, 7};
+    ComplexBit c = a * b;
+
+    std::cout << "ComplexBit mul: (" 
+              << c.real << ", " << c.imag << ")\n";
+
+    // --- QuatBit の最小動作確認 ---
+    QuatBit qi = QuatBit::unitI();
+    QuatBit qj = QuatBit::unitJ();
+    QuatBit qk = qi * qj;
+
+    std::cout << "QuatBit ij = k: (" 
+              << qk.w << ", " << qk.x << ", " << qk.y << ", " << qk.z << ")\n";
+
+    // --- branchlessSelect の確認 ---
+    std::cout << "branchlessSelect(1, 10, 20) = "
+              << branchlessSelect(1, 10, 20) << "\n";
+
+    // --- BSCM の最小動作確認 ---
+    U64 s = 10;
+    U64 next = bscmDelta(s);
+
+    std::cout << "bscmDelta(10) = " << next << "\n";
+
+    return 0;
+}
