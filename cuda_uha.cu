@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <cuda_runtime.h>
 
 using U64 = unsigned long long;
 
@@ -79,8 +80,10 @@ int main() {
     U64 h_start[N] = {0xFFFFull, 0x0Full, 0xF0ull, 0xAAAAull};
     U64 h_mask[N]  = {0x00FFull, 0x00FFull, 0x00FFull, 0x00FFull};
 
-    U64 *d_start, *d_mask;
-    int *d_out, h_out;
+    U64 *d_start = nullptr;
+    U64 *d_mask  = nullptr;
+    int *d_out   = nullptr;
+    int h_out    = 0;
 
     cudaMalloc(&d_start, sizeof(U64) * N);
     cudaMalloc(&d_mask,  sizeof(U64) * N);
@@ -91,6 +94,7 @@ int main() {
 
     // 1ブロック1スレッド（Minimal Spec）
     uha_kernel<N><<<1,1>>>(d_start, d_mask, STEPS, d_out);
+    cudaDeviceSynchronize();
 
     cudaMemcpy(&h_out, d_out, sizeof(int), cudaMemcpyDeviceToHost);
 
