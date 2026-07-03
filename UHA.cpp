@@ -18,7 +18,11 @@ inline U64 uxor(U64 a, U64 b) { return a ^ b; }
 template<std::size_t N>
 struct UVec {
     std::array<U64, N> v;
-    UVec() = default;
+
+    UVec() {
+        v.fill(0);
+    }
+
     explicit UVec(const std::array<U64, N>& a) : v(a) {}
 };
 
@@ -29,13 +33,15 @@ inline std::uint32_t norm(U64 x) {
 template<std::size_t N>
 std::uint32_t norm(const UVec<N>& u) {
     std::uint32_t s = 0;
-    for (auto& x : u.v) s += norm(x);
+    for (const auto& x : u.v)
+        s += popcount64(x);
     return s;
 }
 
 template<std::size_t N>
 struct UOp {
     std::array<U64, N> mask;
+
     explicit UOp(const std::array<U64, N>& m) : mask(m) {}
 
     UVec<N> apply(const UVec<N>& x) const {
@@ -50,6 +56,7 @@ template<std::size_t N>
 UVec<N> minimize_norm(const UVec<N>& start, const UOp<N>& op, std::size_t steps) {
     UVec<N> best = start;
     std::uint32_t best_norm = norm(best);
+
     UVec<N> cur = start;
 
     for (std::size_t k = 0; k < steps; ++k) {
