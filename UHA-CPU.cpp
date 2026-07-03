@@ -11,9 +11,20 @@ using U64 = std::uint64_t;
 // ===============================
 //  CPU popcount (C++17)
 // ===============================
-inline std::uint32_t norm64(U64 x) {
+inline std::uint32_t popcount64(U64 x) {
     return __builtin_popcountll(x);
 }
+
+// ===============================
+//  多元ベクトル
+// ===============================
+template<std::size_t N>
+struct UVec {
+    std::array<U64, N> v;
+
+    UVec() { v.fill(0); }  // ★ゼロ初期化（重要）
+    explicit UVec(const std::array<U64, N>& a) : v(a) {}
+};
 
 // ===============================
 //  UOp: XOR
@@ -25,20 +36,12 @@ inline void apply(const UVec<N>& x, const std::array<U64, N>& mask, UVec<N>& y) 
 }
 
 // ===============================
-//  多元ベクトル
-// ===============================
-template<std::size_t N>
-struct UVec {
-    std::array<U64, N> v;
-};
-
-// ===============================
 //  ノルム計算
 // ===============================
 template<std::size_t N>
 inline std::uint32_t norm(const UVec<N>& u) {
     std::uint32_t s = 0;
-    for (auto& x : u.v) s += norm64(x);
+    for (auto& x : u.v) s += popcount64(x);
     return s;
 }
 
@@ -49,7 +52,7 @@ template<std::size_t N>
 UVec<N> minimize_norm(const UVec<N>& start, const std::array<U64, N>& mask, std::size_t steps) {
     UVec<N> best = start;
     UVec<N> cur  = start;
-    UVec<N> tmp;
+    UVec<N> tmp;  // ★ゼロ初期化されるので安全
 
     std::uint32_t best_norm = norm(best);
 
