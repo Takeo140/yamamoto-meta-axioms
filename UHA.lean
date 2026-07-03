@@ -1,6 +1,9 @@
+License Apache 2.0  Takeo Yamamoto
 import Mathlib.Data.ZMod.Basic
-import Mathlib.Data.Vector.Basic
+import Mathlib.Data.Fin.Basic
 import Mathlib.Algebra.Module.Basic
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Algebra.BigOperators.Basic
 
 /-- UltraCore の基本スカラー：U64 有限環 -/
 abbrev U64 := ZMod (2^64)
@@ -30,7 +33,9 @@ def mulWith
   (c : Fin n → Fin n → UHA n)
   (x y : UHA n) : UHA n :=
   -- UltraCore の C++ 実装側で展開される部分
-  ⟨fun i => 0⟩
+  ⟨fun i =>
+    ∑ j, ∑ k, (x.coords j) * (y.coords k) * (c j k).coords i
+  ⟩
 
 /-- ノルム（量子状態の離散版） -/
 def norm (x : UHA n) : U64 :=
