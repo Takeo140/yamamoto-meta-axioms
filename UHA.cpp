@@ -8,28 +8,20 @@
 
 using U64 = std::uint64_t;
 
-// C++17 互換 popcount
+// C++17 popcount
 inline std::uint32_t popcount64(U64 x) {
     return __builtin_popcountll(x);
 }
-
-inline U64 uxor(U64 a, U64 b) { return a ^ b; }
 
 template<std::size_t N>
 struct UVec {
     std::array<U64, N> v;
 
-    UVec() {
-        v.fill(0);
-    }
-
+    UVec() { v.fill(0); }
     explicit UVec(const std::array<U64, N>& a) : v(a) {}
 };
 
-inline std::uint32_t norm(U64 x) {
-    return popcount64(x);
-}
-
+// ノルム（popcount）
 template<std::size_t N>
 std::uint32_t norm(const UVec<N>& u) {
     std::uint32_t s = 0;
@@ -38,6 +30,35 @@ std::uint32_t norm(const UVec<N>& u) {
     return s;
 }
 
+/*------------------------------------------------------------
+  UltraCore HyperAlgebra の構造定数テンソル
+  c[j][k] は UVec<N>（Lean の c j k : UHA n に対応）
+------------------------------------------------------------*/
+template<std::size_t N>
+using CTensor = std::array<std::array<UVec<N>, N>, N>;
+
+/*------------------------------------------------------------
+  UHA の乗法： (x * y)_i = Σ_j Σ_k x_j y_k c[j][k].v[i]
+------------------------------------------------------------*/
+template<std::size_t N>
+UVec<N> mul(const UVec<N>& x, const UVec<N>& y, const CTensor<N>& c) {
+    UVec<N> out;
+
+    for (std::size_t i = 0; i < N; ++i) {
+        U64 acc = 0;
+
+        for (std::size_t j = 0; j < N; ++j)
+            for (std::size_t k = 0; k < N; ++k)
+                acc ^= (x.v[j] & y.v[k] & c[j][k].v[i]);
+
+        out.v[i] = acc;
+    }
+    return out;
+}
+
+/*------------------------------------------------------------
+  離散ユニタリ作用素（XOR 型）
+------------------------------------------------------------*/
 template<std::size_t N>
 struct UOp {
     std::array<U64, N> mask;
@@ -47,11 +68,14 @@ struct UOp {
     UVec<N> apply(const UVec<N>& x) const {
         UVec<N> y;
         for (std::size_t i = 0; i < N; ++i)
-            y.v[i] = uxor(x.v[i], mask[i]);
+            y.v[i] = x.v[i] ^ mask[i];
         return y;
     }
 };
 
+/*------------------------------------------------------------
+  norm 最小化（探索）
+------------------------------------------------------------*/
 template<std::size_t N>
 UVec<N> minimize_norm(const UVec<N>& start, const UOp<N>& op, std::size_t steps) {
     UVec<N> best = start;
