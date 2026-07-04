@@ -44,8 +44,20 @@ int norm_vec(const U64* __restrict__ v)
 }
 
 // ===============================
+// warp 内 min reduce
+// ===============================
+__device__ __forceinline__
+int warpReduceMin(int v) {
+    for (int offset = 16; offset > 0; offset >>= 1) {
+        int other = __shfl_down_sync(0xffffffff, v, offset);
+        v = v < other ? v : other;
+    }
+    return v;
+}
+
+// ===============================
 // Lean: step = apply → norm
-// CUDA: warp 並列探索器
+// CUDA: warp 並列探索器 + block 集約
 // ===============================
 template<int N>
 __global__
@@ -54,7 +66,8 @@ void uha_step_kernel(const U64* __restrict__ start,
                      int steps,
                      int* __restrict__ out_norm)
 {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int tid_global = blockIdx.x * blockDim.x + threadIdx.x;
+    int lane       = threadIdx.x & 31;
 
     U64 cur[N];
     U64 tmp[N];
@@ -62,7 +75,7 @@ void uha_step_kernel(const U64* __restrict__ start,
     // Lean: x₀ = start ⊕ tid
     #pragma unroll
     for (int i = 0; i < N; ++i)
-        cur[i] = start[i] ^ (U64)(tid * 0x9E3779B97F4A7C15ull);
+        cur[i] = start[i] ^ (U64)(tid_global * 0x9E3779B97F4A7C15ull);
 
     int best = norm_vec<N>(cur);
 
@@ -81,8 +94,27 @@ void uha_step_kernel(const U64* __restrict__ start,
         if (n < best) best = n;
     }
 
-    // 全スレッドの最小値を集約
-    atomicMin(out_norm, best);
+    // warp 内で最小値
+    int warp_min = warpReduceMin(best);
+
+    // block 内で warp の最小値を shared に集約
+    __shared__ int s_block_min[32]; // 最大 32 warp/block を想定
+    if (lane == 0) {
+        int warp_id = threadIdx.x >> 5;
+        s_block_min[warp_id] = warp_min;
+    }
+    __syncthreads();
+
+    // block 内の最小値を 1 スレッドが計算
+    if (threadIdx.x == 0) {
+        int block_min = s_block_min[0];
+        int warp_count = blockDim.x >> 5;
+        for (int w = 1; w < warp_count; ++w)
+            block_min = block_min < s_block_min[w] ? block_min : s_block_min[w];
+
+        // グローバル最小値を atomicMin（block ごとに 1 回）
+        atomicMin(out_norm, block_min);
+    }
 }
 
 // ===============================
@@ -111,7 +143,7 @@ int main() {
     cudaMemcpy(d_out,   &h_out,  sizeof(int),    cudaMemcpyHostToDevice);
 
     // Lean: 多状態並列 → CUDA: 多スレッド並列
-    constexpr int THREADS = 32;     // warp
+    constexpr int THREADS = 32;     // 1 warp
     constexpr int BLOCKS  = 1024;   // 1024 warp = 32768 探索器
 
     uha_step_kernel<N><<<BLOCKS, THREADS>>>(d_start, d_mask, STEPS, d_out);
