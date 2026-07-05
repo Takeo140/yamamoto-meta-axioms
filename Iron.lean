@@ -41,18 +41,24 @@ def IronSystem : MetaSystem IronState where
 
   -- dissolve_iron は temp/potential を変えないため2回適用 = 1回適用
   is_fixed_point := fun s => by
-    simp only [dissolve_iron]
-    split_ifs <;> rfl
+    unfold dissolve_iron
+    split <;> rfl
 
   -- 前順序は temp/potential のみ → resolve 後も temp/potential 不変 → hab がそのまま成立
   is_monotone := by
     intro a b hab
-    simp only [dissolve_iron, Monotone]
-    split_ifs with ha hb hb
-    · exact hab
-    · -- ha: a.temp ≥ 800 ∧ a.potential ≥ 50
-      -- hab: a.temp ≤ b.temp ∧ a.potential ≤ b.potential
-      -- → b.temp ≥ 800 ∧ b.potential ≥ 50 → hb と矛盾
-      exfalso; exact hb ⟨by linarith [hab.1, ha.1], by linarith [hab.2, ha.2]⟩
-    · exact hab
-    · exact hab
+    unfold dissolve_iron Monotone
+    split with ha
+    · split with hb
+      · exact hab
+      · -- ha: a.temp ≥ 800 ∧ a.potential ≥ 50
+        -- hb: ¬(b.temp ≥ 800 ∧ b.potential ≥ 50)
+        -- hab: a.temp ≤ b.temp ∧ a.potential ≤ b.potential
+        exfalso
+        push_neg at hb
+        cases hb with
+        | inl h => linarith [hab.1, ha.1]
+        | inr h => linarith [hab.2, ha.2]
+    · split with hb
+      · exact hab
+      · exact hab
