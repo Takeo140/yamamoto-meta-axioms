@@ -61,7 +61,7 @@ python verify_42.py
 
 ## 📊 Quick Demo & Output Verified (Massive Population Game)
 
-You can compile and run `uha_population_bench.cpp` instantly on any standard machine or mobile ARM environment. It simulates a massive evolutionary game of **1,024 players** executing 1,000,000 steps of dynamic strategy updates, comparing the traditional floating-point quantum simulator approach against the UHA discrete algebra.
+You can compile and run `UHA_demo.cpp` instantly on any standard machine or mobile ARM environment. It simulates a massive evolutionary game of **1,024 players** executing 1,000,000 steps of dynamic strategy updates, comparing the traditional floating-point quantum simulator approach against the UHA discrete algebra.
 
 ### Benchmark Results (Mobile ARM64 Platform)
 
