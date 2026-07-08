@@ -41,6 +41,17 @@ This repository features an extensive suite of formal proofs (Lean 4) and high-p
     *   `Economics.lean`, `BitEconomics.lean`: Macro/microeconomic models, including formalized analyses of Capitalism and Communism.
     *   `Nuclear.lean`, `Plutonium2.lean`, `Iron.lean`: Advanced stabilization control systems for physical and chemical processes.
 
+## 📊 Quick Demo & Output Verified
+You can compile and run `UHA_demo.cpp` instantly on any machine (even on a smartphone C++ environment). 
+It demonstrates exact O(1) convergence to a fixed-point equilibrium via integer-based wave cancellation:
+
+```text
+Initial Norm (ZMod 2^64): 8501420084
+...
+Step  4 | Norm: 0 | Leading Coord: 4558557616573251584
+Step  5 | Norm: 0 | Leading Coord: 0
+[SUCCESS] System fully converged with limit cycle period: 1 at Step 6.
+
 ---
 
 ## 🛠️ Getting Started
