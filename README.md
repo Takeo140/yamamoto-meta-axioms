@@ -59,13 +59,26 @@ cd yamamoto-meta-axioms
 # Run the system verification check
 python verify_42.py
 
-## 📊 Quick Demo & Output Verified
-You can compile and run `UHA_demo.cpp` instantly on any machine (even on a smartphone C++ environment). 
-It demonstrates exact O(1) convergence to a fixed-point equilibrium via integer-based wave cancellation:
+## 📊 Quick Demo & Output Verified (Massive Population Game)
+
+You can compile and run `uha_population_bench.cpp` instantly on any standard machine or mobile ARM environment. It simulates a massive evolutionary game of **1,024 players** executing 1,000,000 steps of dynamic strategy updates, comparing the traditional floating-point quantum simulator approach against the UHA discrete algebra.
+
+### Benchmark Results (Mobile ARM64 Platform)
 
 ```text
-Initial Norm (ZMod 2^64): 8501420084
-...
-Step  4 | Norm: 0 | Leading Coord: 4558557616573251584
-Step  5 | Norm: 0 | Leading Coord: 0
-[SUCCESS] System fully converged with limit cycle period: 1 at Step 6.
+=========================================================
+  Evolutionary Population Game Engine (1,024 Players)
+=========================================================
+
+[1] Running Traditional Quantum Population (1,024 Players)...
+  -> Quantum Elapsed Time: 7.16771 [s]
+  -> Final Quantum Norm  : 1 (Rounding error accumulated / Information loss)
+
+[2] Running UHA Population (1,024 Players)...
+  -> UHA Elapsed Time    : 0.114384 [s]
+  -> Final UHA Active Norm: 512 (100% stable / Exact Evolutionary Stable Strategy)
+
+=========================================================
+  UHA Population Speedup Factor: 62.6634x Faster!
+=========================================================
+
