@@ -60,7 +60,7 @@ cd yamamoto-meta-axioms
 python verify_42.py
 
 ## 📊 Quick Demo & Output Verified
-You can compile and run `HUA_demo.cpp` instantly on any machine (even on a smartphone C++ environment). 
+You can compile and run `UHA_demo.cpp` instantly on any machine (even on a smartphone C++ environment). 
 It demonstrates exact O(1) convergence to a fixed-point equilibrium via integer-based wave cancellation:
 
 ```text
