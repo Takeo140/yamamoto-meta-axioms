@@ -54,7 +54,8 @@ Step  5 | Norm: 0 | Leading Coord: 0
 
 ---
 
-## 🛠️ Getting Started
+
+ 🛠️ Getting Started
 
 ### Prerequisites
 *   **Lean 4**: Ensure you have `elan` and the Lean 4 toolchain installed.
