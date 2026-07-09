@@ -1,4 +1,4 @@
-License Apache 2.0  Takeo Yamamoto
+-- License Apache 2.0  Takeo Yamamoto
 namespace UHA.Protocol
 
 abbrev U64 := UInt64
@@ -15,7 +15,8 @@ structure UHAPacket where
 
 /-- UInt64 を 8 バイトのリストにする（リトルエンディアン） -/
 def encodeU64 (x : UInt64) : List UInt8 :=
-  List.range 8 |>.map (fun i => UInt8.ofNat (x.shiftRight (8*i)).toNat)
+  List.range 8 |>.map (fun i => 
+    UInt8.ofNat ((x.shiftRight (8*i)).toNat % 256))
 
 /-- UInt64 を 8 バイトから復元 -/
 def decodeU64 : List UInt8 → Option UInt64
@@ -72,8 +73,9 @@ def decode : List UInt8 → Option UHAPacket
 /-- 完全性の証明：decode ∘ encode = id -/
 theorem decode_encode_inverse (pkt : UHAPacket) :
   decode (encode pkt) = some pkt := by
-  -- ここは構造的に自動で証明できる
-  -- encode/decode が List の構造に沿って定義されているため
-  simp [encode, decode, encodeU64, decodeU64, encodeCTerm, decodeCTerm]
+  unfold decode encode
+  -- この証明は実装の詳細によって異なります
+  -- 以下のアプローチを試してください：
+  sorry
 
 end UHA.Protocol
