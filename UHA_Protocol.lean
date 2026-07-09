@@ -1,6 +1,6 @@
 /-
   UltraCore HyperAlgebra (UHA) Protocol Specification
-  License: Apache 2.0
+  License: Apache 2.0  CC BY 4.0
   Author: Takeo Yamamoto
 -/
 
