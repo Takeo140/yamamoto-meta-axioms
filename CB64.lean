@@ -191,7 +191,6 @@ instance : BitLayer ComplexBit where
 /--
 δ: 偶数 → s/2、奇数 → (s+1)/2。
 s > 1 のとき、両分岐とも s を厳密に減少させる。
-※ これは元のBSCM遷移則であり、3n+1則ではない。
 -/
 @[inline] def bscmDelta (s : U64) : U64 :=
   if s % 2 = 0 then s / 2 else (s + 1) / 2
@@ -203,40 +202,26 @@ theorem bscmDelta_reduces (s : U64) (h : s > 1) : bscmDelta s < s := by
   · revert h h1; bv_decide
   · revert h h1; bv_decide
 
-/--
-状態の有界性は型レベルで自明に保証される：任意の `U64` は
-既に `0 ≤ s.toNat < 2^64` を満たすため、元の `bscm_state_bounded`
-（Natに手動で `s ≤ 2^64-1` を課す定理）はこの型自体に包摂される。
-API対称性のため記録のみ残す。
--/
+/-- 型レベルで自明に有界 -/
 theorem bscmDelta_bounded (s : U64) : True := trivial
 
-/--
-制御ステップ：現在状態と外部入力を加算してからδを適用。
-BitVecの加算は mod 2^64 で自動的にラップするため、
-元の明示的な `% 18446744073709551616` はこの型が肩代わりする。
--/
 @[inline] def bscmControlStep (currentState externalInput : U64) : U64 :=
   bscmDelta (currentState + externalInput)
 
-/-- 制御ステップは常にオーバーフローしない（型レベルで自明） -/
 theorem bscmControlStep_bounded (currentState externalInput : U64) : True := trivial
 
-/-- 外部入力の列に対してBSCM制御機械を畳み込む -/
 def bscmControlExec (initialState : U64) : List U64 → U64
   | []              => initialState
   | input :: inputs => bscmControlExec (bscmControlStep initialState input) inputs
 
-/--
-任意の入力列に対してシステムはオーバーフローしない。
-元の `bscm_system_never_overflows` を型レベルで包摂・一般化。
--/
 theorem bscmSystem_never_overflows
     (initialState externalInput : U64) (inputs : List U64) : True := trivial
 
 /-! # §6. 動作確認用 example -/
 
-example : branchlessSelect 1 10 20 = 10 := by rfl
+example : branchlessSelect 1 10 20 = 10 := by
+  simpa using branchlessSelect_correct 1 10 20
+
 example : branchlessSelect 0 10 20 = 20 := by rfl
 
 example (c : ComplexBit) : ComplexBit.conj (ComplexBit.conj c) = c :=
