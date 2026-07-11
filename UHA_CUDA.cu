@@ -56,8 +56,7 @@ int warpReduceMin(int v) {
 }
 
 // ===============================
-// Lean: step = apply → norm
-// CUDA: warp 並列探索器 + block 集約
+// UHA step kernel (修正版)
 // ===============================
 template<int N>
 __global__
@@ -72,47 +71,45 @@ void uha_step_kernel(const U64* __restrict__ start,
     U64 cur[N];
     U64 tmp[N];
 
-    // Lean: x₀ = start ⊕ tid
+    // 改善版：i 依存のハッシュで探索空間を広げる
     #pragma unroll
     for (int i = 0; i < N; ++i)
-        cur[i] = start[i] ^ (U64)(tid_global * 0x9E3779B97F4A7C15ull);
+        cur[i] = start[i] ^
+                 (U64)(tid_global * 0x9E3779B97F4A7C15ull +
+                       i         * 0xD1B54A32D192ED03ull);
 
     int best = norm_vec<N>(cur);
 
-    // Lean: step iteration
+    // UHA step iteration
     for (int k = 0; k < steps; ++k) {
 
-        // x := UOp.apply(x)
         uop_apply<N>(cur, mask, tmp);
 
         #pragma unroll
         for (int i = 0; i < N; ++i)
             cur[i] = tmp[i];
 
-        // norm(x)
         int n = norm_vec<N>(cur);
         if (n < best) best = n;
     }
 
-    // warp 内で最小値
+    // warp 内 reduce
     int warp_min = warpReduceMin(best);
 
-    // block 内で warp の最小値を shared に集約
-    __shared__ int s_block_min[32]; // 最大 32 warp/block を想定
+    // block 内 reduce（可変 warp 数）
+    extern __shared__ int s_block_min[];
     if (lane == 0) {
         int warp_id = threadIdx.x >> 5;
         s_block_min[warp_id] = warp_min;
     }
     __syncthreads();
 
-    // block 内の最小値を 1 スレッドが計算
     if (threadIdx.x == 0) {
-        int block_min = s_block_min[0];
         int warp_count = blockDim.x >> 5;
+        int block_min = s_block_min[0];
         for (int w = 1; w < warp_count; ++w)
             block_min = block_min < s_block_min[w] ? block_min : s_block_min[w];
 
-        // グローバル最小値を atomicMin（block ごとに 1 回）
         atomicMin(out_norm, block_min);
     }
 }
@@ -123,7 +120,7 @@ void uha_step_kernel(const U64* __restrict__ start,
 int main() {
 
     constexpr int N = 4;
-    constexpr int STEPS = 10000000;
+    constexpr int STEPS = 2000000;   // 改善：現実的なステップ数
 
     U64 h_start[N] = {0xFFFFull, 0x0Full, 0xF0ull, 0xAAAAull};
     U64 h_mask[N]  = {0x00FFull, 0x00FFull, 0x00FFull, 0x00FFull};
@@ -142,11 +139,12 @@ int main() {
     cudaMemcpy(d_mask,  h_mask,  sizeof(U64) * N, cudaMemcpyHostToDevice);
     cudaMemcpy(d_out,   &h_out,  sizeof(int),    cudaMemcpyHostToDevice);
 
-    // Lean: 多状態並列 → CUDA: 多スレッド並列
-    constexpr int THREADS = 32;     // 1 warp
-    constexpr int BLOCKS  = 1024;   // 1024 warp = 32768 探索器
+    constexpr int THREADS = 256;     // warp 8 個
+    constexpr int BLOCKS  = 512;     // 探索器 131072 個
 
-    uha_step_kernel<N><<<BLOCKS, THREADS>>>(d_start, d_mask, STEPS, d_out);
+    int shared_bytes = (THREADS / 32) * sizeof(int);
+
+    uha_step_kernel<N><<<BLOCKS, THREADS, shared_bytes>>>(d_start, d_mask, STEPS, d_out);
     cudaDeviceSynchronize();
 
     cudaMemcpy(&h_out, d_out, sizeof(int), cudaMemcpyDeviceToHost);
