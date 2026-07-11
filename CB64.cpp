@@ -4,7 +4,6 @@
 // Copyright (c) 2026 Yamamoto Takeo
 // License: Apache License 2.0 / CC BY 4.0
 
-#pragma once
 #include <cstdint>
 #include <vector>
 #include <concepts>   // for std::same_as
@@ -14,13 +13,10 @@ using U64 = std::uint64_t;
 // ---------------------------------------------------------------------------
 // Section 1: U64 branchless core
 // ---------------------------------------------------------------------------
-
 namespace u64lemmas {
-
-constexpr U64 neg_or_self_msb(U64 x) {
-    return (static_cast<U64>(-static_cast<std::int64_t>(x)) | x) >> 63;
-}
-
+    constexpr U64 neg_or_self_msb(U64 x) {
+        return (static_cast<U64>(-static_cast<std::int64_t>(x)) | x) >> 63;
+    }
 } // namespace u64lemmas
 
 constexpr U64 nonzeroMask(U64 x) {
@@ -39,7 +35,6 @@ constexpr U64 branchlessSelect(U64 control, U64 a, U64 b) {
 // ---------------------------------------------------------------------------
 // Section 2: ComplexBit
 // ---------------------------------------------------------------------------
-
 struct ComplexBit {
     U64 real{};
     U64 imag{};
@@ -58,8 +53,10 @@ struct ComplexBit {
     }
 
     constexpr ComplexBit operator-() const {
-        return { static_cast<U64>(-static_cast<std::int64_t>(real)),
-                 static_cast<U64>(-static_cast<std::int64_t>(imag)) };
+        return {
+            static_cast<U64>(-static_cast<std::int64_t>(real)),
+            static_cast<U64>(-static_cast<std::int64_t>(imag))
+        };
     }
 
     static constexpr ComplexBit zero() { return {0, 0}; }
@@ -80,13 +77,11 @@ struct ComplexBit {
 
 static_assert(ComplexBit::unitI() * ComplexBit::unitI() == -ComplexBit::one());
 static_assert(ComplexBit{3, 5}.conj().conj() == ComplexBit{3, 5});
-static_assert(ComplexBit{7, 2}.rotate90().rotate90().rotate90().rotate90()
-              == ComplexBit{7, 2});
+static_assert(ComplexBit{7, 2}.rotate90().rotate90().rotate90().rotate90() == ComplexBit{7, 2});
 
 // ---------------------------------------------------------------------------
 // Section 3: QuatBit
 // ---------------------------------------------------------------------------
-
 struct QuatBit {
     U64 w{}, x{}, y{}, z{};
 
@@ -122,7 +117,6 @@ static_assert(QuatBit::unitK() * QuatBit::unitK() == -QuatBit::one());
 // ---------------------------------------------------------------------------
 // Section 4: BitLayer
 // ---------------------------------------------------------------------------
-
 template <class T>
 concept BitLayer = requires(T t, U64 x) {
     { T::inject(x) } -> std::same_as<T>;
@@ -148,9 +142,9 @@ static_assert(ComplexBitLayer::inject(42).extract() == 42);
 // ---------------------------------------------------------------------------
 // Section 5: BSCM
 // ---------------------------------------------------------------------------
-
 constexpr U64 bscmDelta(U64 s) {
-    return (s % 2 == 0) ? (s / 2) : ((s + 1) / 2);
+    // 完全にビット演算のみを用いたブランチレス実装
+    return (s + (s & 1)) >> 1;
 }
 
 static_assert(bscmDelta(2) < 2);
@@ -172,30 +166,23 @@ inline U64 bscmControlExec(U64 initialState, const std::vector<U64>& inputs) {
 // ---------------------------------------------------------------------------
 // Section 6: sanity checks
 // ---------------------------------------------------------------------------
-
 static_assert(branchlessSelect(1, 10, 20) == 10);
 static_assert(branchlessSelect(0, 10, 20) == 20);
 
 #include <iostream>
-#include "ultra_core.hpp"
 
 int main() {
     ComplexBit a{3, 5};
     ComplexBit b{2, 7};
     ComplexBit c = a * b;
-
-    std::cout << "ComplexBit mul: (" 
-              << c.real << ", " << c.imag << ")\n";
+    std::cout << "ComplexBit mul: (" << c.real << ", " << c.imag << ")\n";
 
     QuatBit qi = QuatBit::unitI();
     QuatBit qj = QuatBit::unitJ();
     QuatBit qk = qi * qj;
+    std::cout << "QuatBit ij = k: (" << qk.w << ", " << qk.x << ", " << qk.y << ", " << qk.z << ")\n";
 
-    std::cout << "QuatBit ij = k: (" 
-              << qk.w << ", " << qk.x << ", " << qk.y << ", " << qk.z << ")\n";
-
-    std::cout << "branchlessSelect(1, 10, 20) = "
-              << branchlessSelect(1, 10, 20) << "\n";
+    std::cout << "branchlessSelect(1, 10, 20) = " << branchlessSelect(1, 10, 20) << "\n";
 
     U64 s = 10;
     U64 next = bscmDelta(s);
