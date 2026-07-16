@@ -1,3 +1,4 @@
+License Apache 2.0  Takeo Yamamoto
 import Mathlib.Data.ZMod.Basic
 import Mathlib.Data.Fin.Basic
 import Mathlib.Algebra.Module.Basic
