@@ -1,3 +1,4 @@
+Apache 2.0  Takeo Yamamoto
 /-
   General Information Field Engine (GIFE)
   汎用情報場エンジン：Takeoの抽象計算理論の最上位モデル。
