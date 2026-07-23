@@ -16,24 +16,34 @@ using U64 = uint64_t;
 // UltraCore HyperAlgebra の n 次元キャリア
 template <size_t N>
 struct UHA {
-    std::array<U64, N> coords;
+    std::array<U64, N> coords{}; // {} で初期化を保証
+
+    // 複合代入演算子 (+=)
+    UHA<N>& operator+=(const UHA<N>& other) {
+        for (size_t i = 0; i < N; ++i) {
+            coords[i] += other.coords[i];
+        }
+        return *this;
+    }
 
     // 加算（branchless: オーバーフローが自動的に ZMod (2^64) を構成）
     UHA<N> operator+(const UHA<N>& other) const {
-        UHA<N> result;
+        UHA<N> result = *this;
+        return result += other;
+    }
+
+    // 複合代入演算子 (*=)
+    UHA<N>& operator*=(U64 a) {
         for (size_t i = 0; i < N; ++i) {
-            result.coords[i] = coords[i] + other.coords[i];
+            coords[i] *= a;
         }
-        return result;
+        return *this;
     }
 
     // スカラー倍
     UHA<N> operator*(U64 a) const {
-        UHA<N> result;
-        for (size_t i = 0; i < N; ++i) {
-            result.coords[i] = a * coords[i];
-        }
-        return result;
+        UHA<N> result = *this;
+        return result *= a;
     }
 };
 
@@ -44,8 +54,9 @@ UHA<N> operator*(U64 a, const UHA<N>& x) {
 }
 
 // 多元代数の乗法（構造定数 c を外部から与える）
-template <size_t N>
-UHA<N> mulWith(const std::function<UHA<N>(size_t, size_t)>& c, const UHA<N>& x, const UHA<N>& y) {
+// 【修正】std::function からテンプレート化し、コンパイル時のインライン展開と最適化（SIMD等）を促進
+template <size_t N, typename Func>
+UHA<N> mulWith(Func&& c, const UHA<N>& x, const UHA<N>& y) {
     UHA<N> result{}; // 0で初期化
     for (size_t j = 0; j < N; ++j) {
         for (size_t k = 0; k < N; ++k) {
@@ -70,12 +81,10 @@ U64 norm(const UHA<N>& x) {
 }
 
 // ユニタリ作用素（量子ゲートの離散版）
-// ※ unitary_like (normの保存則) は型システム上ではなく、関数としての制約（不変条件）となる
 template <size_t N>
 struct UOp {
     std::function<UHA<N>(const UHA<N>&)> f;
 };
-
 
 /*
  * ここから汎用情報場エンジン（GIFE）との統合
@@ -173,21 +182,13 @@ struct Stream {
     std::function<Stream<T>()> tail;
 };
 
-// 状態生成を再帰的に定義するための構造体
+// 【修正】Corec構造体を削除し、ダングリングポインタ（メモリ破壊）のリスクを排除。
+// Engine と FieldState を値キャプチャ [eng, s] することで、クロージャの生存期間を保証。
 template <size_t N>
-struct Corec {
-    Engine<N> eng;
-    Stream<FieldState<N>> operator()(const FieldState<N>& s) const {
-        return Stream<FieldState<N>>{
-            s,
-            // 評価が要求されたとき(tailが呼ばれたとき)に初めて次のステップを計算する
-            [this, s]() { return (*this)(step(eng, s)); }
-        };
-    }
-};
-
-// 自動進化ストリームの開始
-template <size_t N>
-Stream<FieldState<N>> evolution(const Engine<N>& eng, const FieldState<N>& s0) {
-    return Corec<N>{eng}(s0);
+Stream<FieldState<N>> evolution(Engine<N> eng, FieldState<N> s) {
+    return Stream<FieldState<N>>{
+        s,
+        // 評価が要求されたとき(tailが呼ばれたとき)に初めて次のステップを計算する
+        [eng, s]() { return evolution<N>(eng, step(eng, s)); }
+    };
 }
