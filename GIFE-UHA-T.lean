@@ -25,7 +25,7 @@ variable {n : Nat}
 def add (x y : UHA n) : UHA n :=
   ⟨fun i => x.coords i + y.coords i⟩
 
-instance : Add (UHA n) := ⟨add⟟⟩
+instance : Add (UHA n) := ⟨add⟩
 
 /-- スカラー倍 -/
 def smul (a : U64) (x : UHA n) : UHA n :=
@@ -38,12 +38,12 @@ def mulWith
   (c : Fin n → Fin n → UHA n)
   (x y : UHA n) : UHA n :=
   ⟨fun i =>
-    ∑ j, ∑ k, (x.coords j) * (y.coords k) * (c j k).coords i
+    ∑ j : Fin n, ∑ k : Fin n, (x.coords j) * (y.coords k) * (c j k).coords i
   ⟩
 
 /-- ノルム（量子状態の離散版） -/
 def norm (x : UHA n) : U64 :=
-  ∑ i, (x.coords i) * (x.coords i)
+  ∑ i : Fin n, (x.coords i) * (x.coords i)
 
 /-- ユニタリ作用素（量子ゲートの離散版） -/
 structure UOp (n : Nat) where
