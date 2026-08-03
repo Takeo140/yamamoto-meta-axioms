@@ -105,11 +105,14 @@ def diffuse {n : Nat}
       (fun acc nb =>
         let w := top.conn e nb
         UHA.add acc (UHA.smul w nb.state))
-      (⟨fun _ => 0⟩)
+      (⟨fun _ => (0 : U64)⟩)
   let norm :=
-    neighbors.foldl (fun a nb => a + top.conn e nb) 0
+    neighbors.foldl (fun a nb => a + top.conn e nb) (0 : U64)
+  -- NOTE: ZMod (2^64) is not a field, so a multiplicative inverse does not always exist.
+  -- For now return the (weighted) total; proper normalization would require working in a
+  -- field (or computing multiplicative inverses for units only).
   if norm = 0 then e.state
-  else UHA.smul norm⁻¹ total
+  else total
 
 /-- 離散渦度：Topology.curvature を使って UHA を回転させる -/
 def vortex {n : Nat}
