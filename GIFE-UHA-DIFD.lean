@@ -108,11 +108,15 @@ def diffuse {n : Nat}
       (⟨fun _ => (0 : U64)⟩)
   let norm :=
     neighbors.foldl (fun a nb => a + top.conn e nb) (0 : U64)
-  -- NOTE: ZMod (2^64) is not a field, so a multiplicative inverse does not always exist.
-  -- For now return the (weighted) total; proper normalization would require working in a
-  -- field (or computing multiplicative inverses for units only).
+  -- ZMod (2^64) は一般に体ではなく、任意の元に逆元が存在するわけではない。
+  -- そこで norm が 0 のときは元の状態を返し、norm が単元 (isUnit) のときのみ逆元を取り正規化する。
+  -- それ以外（非可逆）は正規化をスキップして加重合計を返す。
   if norm = 0 then e.state
-  else total
+  else if isUnit norm then
+    let inv := ZMod.inv norm
+    UHA.smul inv total
+  else
+    total
 
 /-- 離散渦度：Topology.curvature を使って UHA を回転させる -/
 def vortex {n : Nat}
