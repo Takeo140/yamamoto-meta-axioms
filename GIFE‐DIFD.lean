@@ -110,11 +110,11 @@ def diffuse {n : Nat}
       (fun acc nb =>
         let w := top.conn e nb
         UHA.add acc (UHA.smul w nb.state))
-      (⟨fun _ => 0⟩)
+      (⟨fun _ : Fin n => 0⟩ : UHA n)
   let norm :=
     neighbors.foldl (fun a nb => a + top.conn e nb) 0
   if norm = 0 then e.state
-  else UHA.smul norm⁻¹ total
+  else UHA.smul (norm : U64)⁻¹ total
 
 /-- 離散渦度：Topology.curvature を使って UHA を回転させる -/
 def vortex {n : Nat}
@@ -225,15 +225,15 @@ def stepClassic {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
   { entities := mutated, entropy := newEntropy, topology := newTopology }
 
 /-- 自動進化ストリーム -/
-structure Stream (α : Type) :=
-  (head : α)
-  (tail : Unit → Stream α)
+structure Stream (α : Type u) where
+  head : α
+  tail : Unit → Stream α
 
 /-- Takeo進化ストリーム -/
 def evolutionTakeo {n : Nat} (eng : Engine n) (core : EvolutionCore n) (s₀ : FieldState n) :
   Stream (FieldState n) :=
-  let rec corec (prev : FieldState n) : Stream (FieldState n) :=
-    let next := stepTakeo eng core prev prev
+  let rec corec (prev : FieldState n) (curr : FieldState n) : Stream (FieldState n) :=
+    let next := stepTakeo eng core prev curr
     { head := prev,
-      tail := fun _ => corec next }
-  corec s₀
+      tail := fun _ => corec curr (stepClassic eng curr) }
+  corec s₀ (stepClassic eng s₀)
