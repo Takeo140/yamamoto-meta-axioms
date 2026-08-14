@@ -10,29 +10,53 @@ abbrev U64 := UInt64
 
 /──────────────────────────────────────────────
   1. UltraCore HyperAlgebra (UHA) — Continuous Core
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 -- 連続メモリ(キャッシュフレンドリー)な配列として定義
 structure UHA where
   coords : Array U64
+  deriving Repr, Inhabited, BEq
 
 namespace UHA
 
+/-- 配列長を返すユーティリティ -/
+def length (x : UHA) : Nat := x.coords.size
+
+/-- 長さ n のゼロベクトルを生成するユーティリティ -/
+def mkZero (n : Nat) : UHA := ⟨Array.mkArray n 0⟩
+
+/-- zipWith を用いる際に長さ一致を要求する安全版 -/
+def zipWithRequireEq (f : U64 → U64 → U64) (x y : UHA) : UHA :=
+  if x.coords.size == y.coords.size then
+    ⟨x.coords.zipWith y.coords f⟩
+  else
+    panic! "UHA.zipWithRequireEq: size mismatch"
+
 -- ループ展開とハードウェアネイティブな64bit加算（オーバーフローは自動ラップアラウンド）
 def add (x y : UHA) : UHA :=
-  ⟨x.coords.zipWith y.coords (· + ·)⟩
+  zipWithRequireEq (· + ·) x y
 
 def smul (a : U64) (x : UHA) : UHA :=
   ⟨x.coords.map (fun v => a * v)⟩
 
--- 内積（ノルム計算）: ゼロアロケーションで畳み込む
-def norm (x : UHA) : U64 :=
+/--
+ 内積（ノルム計算）: U64 で計算すると 2^64 でラップすることに注意。
+ 必要なら `normNat` を使ってオーバーフローを回避できます。
+-/
+def normU64 (x : UHA) : U64 :=
   x.coords.foldl (fun acc v => acc + (v * v)) 0
+
+/-- オーバーフローを避ける Nat 版の内積（正確なノルム計算用） -/
+def normNat (x : UHA) : Nat :=
+  x.coords.foldl (fun (acc : Nat) (v : U64) => acc + (v.toNat * v.toNat)) 0
+
+/-- 既定の `norm` は u64 版。意図的にラップを使う場合はこれを用いる。 -/
+def norm := normU64
 
 end UHA
 
 /──────────────────────────────────────────────
   2. BSCM — Discrete Control Core (Bitwise Operations)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 -- 剰余演算(%)と除算(/)を、CPUのビットマスク(&&&)とシフト(>>>)に置換
 @[inline]
@@ -49,16 +73,17 @@ def bscm_control_step (current_state : U64) (external_input : U64) : U64 :=
 
 /──────────────────────────────────────────────
   3. DIFD — Fluid Core
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Flow where
   vel       : UHA
   press     : UHA
   viscosity : U64
+  deriving Repr, Inhabited
 
 /──────────────────────────────────────────────
   4. GIFE — Field Engine (Optimized Memory Layout)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Entity where
   id       : U64        -- NatからU64へ変更しメモリ幅を固定
@@ -68,22 +93,25 @@ structure Entity where
   genome   : U64
   discrete : U64        -- BSCM状態も64bitレジスタに格納
   flow     : Flow
+  deriving Repr, Inhabited
 
 structure Topology where
   -- トポロジーも関数ではなく、隣接行列としてフラットなArrayに格納する想定
   conn_matrix : Array U64 
   viscosity   : U64
   curvature   : U64
+  deriving Repr, Inhabited
 
 structure FieldState where
   entities : Array Entity  -- Listを廃止し、Array(連続領域)へ変更
   entropy  : U64
   topology : Topology
   flow     : Flow
+  deriving Repr, Inhabited
 
 /──────────────────────────────────────────────
   5. Evolution & Dynamics (In-Place / Array processing)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Engine where
   updateEntity : Entity → U64 → Entity
@@ -93,7 +121,7 @@ structure Engine where
 
 /──────────────────────────────────────────────
   6. Unified Execution Step
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 -- Array.mapを使い、C++のstd::transformに近い速度で処理
 def stepClassic (eng : Engine) (s : FieldState) : FieldState :=
@@ -109,3 +137,7 @@ def stepClassic (eng : Engine) (s : FieldState) : FieldState :=
   
   -- エントロピー計算などをここに実装
   { s with entities := mutated }
+
+/-- 簡単な #eval サンプル（テスト用） -/
+#eval UHA.normNat (UHA.mkZero 3)
+#eval bscm_control_step 5 2
