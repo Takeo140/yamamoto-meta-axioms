@@ -15,9 +15,12 @@ import Mathlib.Tactic
 
 /──────────────────────────────────────────────
   1. UltraCore HyperAlgebra (UHA) — Continuous Core
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 abbrev U64 := ZMod (2^64)
+
+/-- modulus for 64-bit U64 as a Nat -/
+def U64_mod : Nat := 2 ^ 64
 
 structure UHA (n : Nat) where
   coords : Fin n → U64
@@ -27,7 +30,7 @@ namespace UHA
 def add {n} (x y : UHA n) : UHA n :=
   ⟨fun i => x.coords i + y.coords i⟩
 
-instance {n} : Add (UHA n) := ⟨add⟟⟩
+instance {n} : Add (UHA n) := ⟨add⟩
 
 def smul {n} (a : U64) (x : UHA n) : UHA n :=
   ⟨fun i => a * x.coords i⟩
@@ -37,10 +40,10 @@ instance {n} : SMul U64 (UHA n) := ⟨smul⟩
 def mulWith {n}
   (c : Fin n → Fin n → UHA n)
   (x y : UHA n) : UHA n :=
-  ⟨fun i => ∑ j, ∑ k, x.coords j * y.coords k * (c j k).coords i⟩
+  ⟨fun i => ∑ j : Fin n, ∑ k : Fin n, x.coords j * y.coords k * (c j k).coords i⟩
 
 def norm {n} (x : UHA n) : U64 :=
-  ∑ i, x.coords i * x.coords i
+  ∑ i : Fin n, x.coords i * x.coords i
 
 structure UOp (n : Nat) :=
   (f : UHA n → UHA n)
@@ -50,13 +53,13 @@ end UHA
 
 /──────────────────────────────────────────────
   2. BSCM — Discrete Control Core (Bounded Collatz)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 def bscm_delta (s : Nat) : Nat :=
   if s % 2 = 0 then s / 2 else (s + 1) / 2
 
 def bscm_control_step (current_state : Nat) (external_input : Nat) : Nat :=
-  let s' := (current_state + external_input) % 18446744073709551616
+  let s' := (current_state + external_input) % U64_mod
   bscm_delta s'
 
 def bscm_control_exec (initial_state : Nat) : List Nat → Nat
@@ -70,7 +73,7 @@ structure BSCM :=
 
 /──────────────────────────────────────────────
   3. DIFD — Fluid Core (Discrete Fluid Dynamics)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Flow (n : Nat) :=
   vel : UHA n
@@ -79,7 +82,7 @@ structure Flow (n : Nat) :=
 
 /──────────────────────────────────────────────
   4. GIFE — Field Engine (Entities, Topology, Dynamics)
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Entity (n : Nat) :=
   id        : Nat
@@ -125,13 +128,13 @@ structure Engine (n : Nat) :=
 
 /──────────────────────────────────────────────
   5. Unified Step — ACM‑TY Heartbeat
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 def step {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
   let updated :=
     s.entities.map (fun e =>
       let newState := eng.dynamics.updateEntity e s.entropy
-      let newDiscrete := eng.bscm.control_step e.discrete (Nat.ofU64 s.entropy)
+      let newDiscrete := eng.bscm.control_step e.discrete (s.entropy.val)
       let newFlow := eng.dynamics.updateFlow e.flow s.topology
       { newState with discrete := newDiscrete, flow := newFlow }
     )
@@ -149,7 +152,7 @@ def step {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
 
 /──────────────────────────────────────────────
   6. Infinite Evolution Stream
-──────────────────────────────────────────────/
+─────────────────────────────────────────────/
 
 structure Stream (α : Type) :=
   (head : α)
