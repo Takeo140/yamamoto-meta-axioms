@@ -158,7 +158,5 @@ structure Stream (α : Type) :=
   (head : α)
   (tail : Unit → Stream α)
 
-def evolution {n : Nat} (eng : Engine n) (s₀ : FieldState n) : Stream (FieldState n) :=
-  let rec corec (s : FieldState n) : Stream (FieldState n) :=
-    { head := s, tail := fun _ => corec (step eng s) }
-  corec s₀
+partial def evolution {n : Nat} (eng : Engine n) (s₀ : FieldState n) : Stream (FieldState n) :=
+  { head := s₀, tail := fun _ => evolution eng (step eng s₀) }
