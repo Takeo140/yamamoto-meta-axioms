@@ -22,16 +22,25 @@ def length (x : UHA) : Nat := x.coords.size
 -- 明示的に型を付けた 0 を使う
 def mkZero (n : Nat) : UHA := ⟨Array.mkArray n (0 : U64)⟩
 
-/-- 長さが等しいときに要素ごとの関数を適用して新しい UHA を返す（失敗する可能性あり） -/
-def zipWithOpt (f : U64 → U64 → U64) (x y : UHA) : Option UHA :=
-  if x.coords.size == y.coords.size then
-    some ⟨x.coords.zipWith y.coords f⟩
-  else
-    none
+/-- 長さが不一致でも安全に動作する zipWith。
+    出力長は max(x.length, y.length) で、範囲外要素は 0 とみなす。
+-/
+def zipWithSafe (f : U64 → U64 → U64) (x y : UHA) : UHA :=
+  let nx := x.coords.size
+  let ny := y.coords.size
+  let n := if nx >= ny then nx else ny
+  let arr := Array.mkEmpty n
+  let arr := arr.pushMany (List.mkArray n (0 : U64)) -- allocate
+  let mut out := { coords := arr } : UHA
+  for i in [0:n] do
+    let xi := x.coords.getD i (0 : U64)
+    let yi := y.coords.getD i (0 : U64)
+    out := { out with coords := out.coords.set! i (f xi yi) }
+  out
 
-/-- add は長さ不一致のとき none を返すように変更 -/
-def add (x y : UHA) : Option UHA :=
-  zipWithOpt (· + ·) x y
+/-- 互換性を保つ add: 長さが違っても panic せず 0 で埋めて和を返す -/
+def add (x y : UHA) : UHA :=
+  zipWithSafe (· + ·) x y
 
 def smul (a : U64) (x : UHA) : UHA :=
   ⟨x.coords.map (fun v => a * v)⟩
@@ -45,27 +54,23 @@ def normNat (x : UHA) : Nat :=
 def norm := normU64
 
 /-- 非線形結合核（テンソル的結合）: c は (i,j) ごとの結合 UHA
-    失敗する可能性があるため Option を返す
+    安全化: 長さ不一致や範囲外アクセスは 0 とみなす。出力長は max(x.length, y.length)。
 -/
-def mulWith (c : Nat → Nat → UHA) (x y : UHA) : Option UHA :=
-  let n := x.length
-  if n ≠ y.length then
-    none
-  else
-    let mut out := UHA.mkZero n
-    for i in [0:n] do
-      let mut acc : U64 := (0 : U64)
-      for j in [0:n] do
-        for k in [0:n] do
-          match x.coords.get? j, y.coords.get? k, (c j k).coords.get? i with
-          | some xj, some yk, some cik =>
-            -- UInt64 はオーバーフローがモジュロ演算になる点に注意
-            acc := acc + xj * yk * cik
-          | _, _, _ =>
-            -- 想定外の範囲外アクセスがあれば失敗
-            return none
-      out := { out with coords := out.coords.set! i acc }
-    some out
+def mulWith (c : Nat → Nat → UHA) (x y : UHA) : UHA :=
+  let nx := x.length
+  let ny := y.length
+  let n := if nx >= ny then nx else ny
+  let mut out := UHA.mkZero n
+  for i in [0:n] do
+    let mut acc : U64 := (0 : U64)
+    for j in [0:n] do
+      for k in [0:n] do
+        let xj := x.coords.getD j (0 : U64)
+        let yk := y.coords.getD k (0 : U64)
+        let cik := (c j k).coords.getD i (0 : U64)
+        acc := acc + xj * yk * cik
+    out := { out with coords := out.coords.set! i acc }
+  out
 
 end UHA
 
@@ -123,10 +128,10 @@ structure Topology where
 namespace Topology
 
 /-- i→j の接続強度を取り出す（単純な i*n + j フラットインデックス）
-    範囲外の場合は none を返すように変更
+    範囲外の場合は 0 を返す（パニックを避ける互換実装）
 -/
-def conn (top : Topology) (n : Nat) (i j : Nat) : Option U64 :=
-  top.conn_matrix.get? ((i * n) + j)
+def conn (top : Topology) (n : Nat) (i j : Nat) : U64 :=
+  top.conn_matrix.getD ((i * n) + j) (0 : U64)
 
 end Topology
 
@@ -152,9 +157,6 @@ structure Engine where
   6. Unified Execution Step
 ─────────────────────────────────────────────/
 
-/-- stepClassic 内では外部 API として Option を扱わない想定のままにしているため、
-    安全性チェックが必要な場合は eng.updateEntity / updateFlow 側で検証すること。
--/
 def stepClassic (eng : Engine) (s : FieldState) : FieldState :=
   let updated :=
     s.entities.map (fun e =>
