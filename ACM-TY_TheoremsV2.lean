@@ -58,11 +58,16 @@ namespace DIFD
 open UHA
 /-- Mock diffuse function matching the expected foldl structure. -/
 def diffuse {n : Nat} (top : UHA.Topology n) (e : GIFE.Entity n) (nbs : List (GIFE.Entity n)) : U64 :=
-  -- In a real implementation this would safely handle bounds, 
-  -- but for the theorem's structural match we use a simplified mock.
-  let norm := (nbs.foldl (fun acc nb => acc + top.conn ⟨e.id % n, sorry⟩ ⟨nb.id % n, sorry⟩) 0)
-  let stateSum := (nbs.foldl (fun acc nb => acc + UHA.smul (top.conn ⟨e.id % n, sorry⟩ ⟨nb.id % n, sorry⟩) nb.state) 0)
-  norm⁻¹ * stateSum
+  -- For n = 0 there are no Fin 0 indices, so return 0 as a harmless default.
+  -- For n = m+1 we build Fin values using Nat.mod_lt and Nat.succ_pos
+  -- to provide the required proofs instead of 'sorry'.
+  match n with
+  | 0 => 0
+  | m+1 =>
+    let idx := fun (x : GIFE.Entity (m+1)) => ⟨x.id % (m+1), Nat.mod_lt (x.id) (Nat.succ_pos m)⟩
+    let norm := nbs.foldl (fun acc nb => acc + top.conn (idx e) (idx nb)) 0
+    let stateSum := nbs.foldl (fun acc nb => acc + UHA.smul (top.conn (idx e) (idx nb)) nb.state) 0
+    norm⁻¹ * stateSum
 end DIFD
 
 
@@ -169,12 +174,16 @@ open UHA
     to equal 1 for this particular weight. Do not generalize this to
     other weights without checking Nat.gcdA for that weight first. -/
 theorem diffuse_weight_two_singleton
-    {n : Nat} (top : UHA.Topology n) (e nb : GIFE.Entity n)
-    (hconn : top.conn ⟨e.id % n, sorry⟩ ⟨nb.id % n, sorry⟩ = (2 : U64)) :
+    {n : Nat} (top : UHA.Topology (n+1)) (e nb : GIFE.Entity (n+1))
+    (hconn : top.conn ⟨e.id % (n+1), Nat.mod_lt (e.id) (Nat.succ_pos n)⟩ ⟨nb.id % (n+1), Nat.mod_lt (nb.id) (Nat.succ_pos n)⟩ = (2 : U64)) :
     DIFD.diffuse top e [nb] = nb.state := by
   unfold DIFD.diffuse
+  -- The definition does a match on n and in the (n+1) branch constructs
+  -- the same Fin values using Nat.mod_lt with Nat.succ_pos, so
+  -- simplifying the foldl with hconn closes the goal.
   simp only [List.foldl, hconn]
   rw [two_inv_eq_one]
   simp [UHA.add, UHA.smul, mul_one]
 
 end DIFD
+
