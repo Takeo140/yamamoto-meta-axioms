@@ -60,7 +60,7 @@ open UHA
 def diffuse {n : Nat} (top : UHA.Topology n) (e : GIFE.Entity n) (nbs : List (GIFE.Entity n)) : U64 :=
   -- For n = 0 there are no Fin 0 indices, so return 0 as a harmless default.
   -- For n = m+1 we build Fin values using Nat.mod_lt and Nat.succ_pos
-  -- to provide the required proofs instead of 'sorry'.
+  -- to provide the required proofs without using placeholders.
   match n with
   | 0 => 0
   | m+1 =>
@@ -186,4 +186,3 @@ theorem diffuse_weight_two_singleton
   simp [UHA.add, UHA.smul, mul_one]
 
 end DIFD
-
