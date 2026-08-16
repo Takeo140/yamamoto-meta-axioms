@@ -147,8 +147,8 @@ def deltaNat (s : Nat) : Nat :=
 theorem deltaNat_lt {s : Nat} (h : 1 < s) : deltaNat s < s := by
   unfold deltaNat
   split
-  · omega
-  · omega
+  · decide
+  · decide
 
 /-- Iterating `deltaNat` from any starting value reaches ≤ 1 in finitely
     many steps. This is the halting theorem the original file's naming
@@ -209,4 +209,3 @@ theorem diffuse_not_average_in_general
   -- build. Everything in Parts A–C above is sorry-free.
 
 end DIFD
-
