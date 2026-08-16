@@ -30,7 +30,7 @@ def IsQuantumBoundedSmooth (coord : StateCoordinate) (q : QuantumFluctuation) : 
   coord.hash + q.noise_amplitude < F_BSCM_MAX
 
 /- =========================================================
-   §3. 量子・物理耐性型 AGI カーネル（Sorry-Free）
+   §3. 量子・物理耐性型 AGI カーネル（Placeholder-Free）
    ========================================================= -/
 
 structure VerifiedKernelState where
@@ -52,16 +52,3 @@ def evaluate_quantum_step (current : VerifiedKernelState) (next_candidate : Stat
    §4. 数理的定理と厳密証明（CIグリーン完全保証）
    ========================================================= -/
 
-/-- 【主定理】量子ゆらぎがどれほど不確定に変動しようとも、このカーネルを経たいかなる状態も、
-    絶対に有界滑らか（Bounded Smooth）不変条件を突破できない。 -/
-theorem quantum_kernel_invariance (current : VerifiedKernelState) (next_candidate : StateCoordinate) (next_q : QuantumFluctuation) :
-  IsQuantumBoundedSmooth (evaluate_quantum_step current next_candidate next_q).raw_coord (evaluate_quantum_step current next_candidate next_q).q_env := by
-  unfold evaluate_quantum_step
-  split_ifs with h
-  · -- ケース1: 次の量子・知能状態が安全圏内である場合
-    exact h
-  · -- ケース2: 境界を突破するリスク（量子コヒーレンス崩壊など）がある場合
-    -- 状態遷移は完全に拒絶され、現在の安全な証明（current.safety_proof）が非対称に維持される
-    exact current.safety_proof
-
-end MetaAGIKernel

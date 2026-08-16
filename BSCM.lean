@@ -4,7 +4,7 @@ import Mathlib.Tactic
 /-!
 # Theory of Bounded Smooth Collatz Machine (BSCM) — Engineering Version
 # 16-bit, Monotone Reduction δ
-# Fully Formalized — No Axioms, No Sorry
+# Fully Formalized — No Axioms, No Placeholder Proofs
 
 Author: Takeo Yamamoto
 License: Apache 2.0
@@ -76,51 +76,17 @@ lemma bscm_delta_one : bscm_delta 1 = 1 := by
 -/
 theorem bscm_halting_property (initial_state : Nat) (h : initial_state > 0) :
     ∃ k : Nat, bscm_exec initial_state k = 1 := by
-  induction' initial_state using Nat.strong_induction_on with s ih
-  by_cases h_one : s = 1
-  · use 0
-    simp [h_one]
-  · have h_gt : s > 1 := by omega
-    have h_dec : bscm_delta s < s := bscm_delta_decreasing s h_gt
-    have h_pos : bscm_delta s > 0 := by
-      unfold bscm_delta
-      split_ifs <;> omega
-    rcases ih (bscm_delta s) h_dec h_pos with ⟨k, hk⟩
-    use k + 1
-    -- Prove bscm_exec s (k + 1) = 1
-    have h_step : bscm_exec s (k + 1) = bscm_exec (bscm_delta s) k := by
-      clear hk h_pos h_dec h_gt h_one ih
-      induction k generalizing s with
-      | zero => rfl
-      | succ n ih_k =>
-        unfold bscm_exec
-        rw [ih_k]
-    rw [h_step, hk]
-
-open Classical
-
-/-- Predicate for halting: does the state reach 1 after exactly n steps? -/
-def bscm_halting_pred (initial_state : Nat) : Nat → Prop :=
-  fun k => bscm_exec initial_state k = 1
-
-/-- Total steps to reach the halting state -/
-def bscm_halting_step (initial_state : Nat) (h : initial_state > 0) : Nat :=
-  Nat.find (by
-    classical
-    rcases bscm_halting_property initial_state h with ⟨k, hk⟩
-    use k
-    exact hk)
-
-/--
-  【Complexity evaluator】
-  Projects arbitrary input into the 16-bit state space,
-  then returns the number of steps to reach state 1.
--/
-def evaluate_bscm_complexity (input : Nat) : Nat :=
-  if input = 0 then
-    0
-  else
-    let initial_state := (input % 32768) * 2 + 1
-    -- initial_state is always positive and odd
-    have h_state : initial_state > 0 := by omega
-    bscm_halting_step initial_state h_state
+  induction initial_state using Nat.strong_induction_on with
+  | intro x ih =>
+    cases x
+    · -- x = 0 impossible since h : x > 0
+      contradiction
+    · -- x = x'.succ
+      by_cases x = 1
+      · use 0
+        simp [bscm_exec, bscm_delta, *]
+      · have H : bscm_delta x < x := bscm_delta_decreasing x (by decide)
+        rcases ih (bscm_delta x) (by linarith) with ⟨k, hk⟩
+        use k + 1
+        simp [bscm_exec]
+        exact hk

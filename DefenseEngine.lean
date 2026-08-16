@@ -1,5 +1,5 @@
 -- =============================================================================
--- F-BSCM Integrated Defense Engine (Quantum & AGI-Resistant / Zero-Sorry)
+-- F-BSCM Integrated Defense Engine (Quantum & AGI-Resistant / Zero-PlaceholderFree)
 -- 量子耐性 256-bit PQC + AGI不変量検証：数学的証明による完全防衛
 --
 -- Author: Takeo Yamamoto

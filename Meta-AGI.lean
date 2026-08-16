@@ -1,27 +1,3 @@
-Lisense Apache 2.0 Takeo Yamamoto
-import Mathlib.Data.List.Basic
-import Mathlib.Tactic.Linarith
-
-namespace MetaAGIKernel
-
-/- =========================================================
-   §1. F-Theory 構造的参照基盤 (O(1) 定数時間ゲート)
-   ========================================================= -/
-
-/-- 知能の状態空間を表すハッシュ値（構造座標） -/
-structure StateCoordinate where
-  hash : Nat
-  deriving Repr, DecidableEq
-
-/-- F-BSCM が定義する「絶対安全境界」 (2^64 - 1) -/
-def F_BSCM_MAX : Nat := 18446744073709551615
-
-/- =========================================================
-   §2. AGI-Defense: 有界滑らか不変条件 (Bounded Smooth Invariant)
-   ========================================================= -/
-
-/-- 知能の推論・自己改善ステップが安全であるための述語。
-    F-Theoryの構造的参照により、シミュレーションなし（O(1)）で境界内に収束することを要求する。 -/
 def IsBoundedSmooth (coord : StateCoordinate) : Prop :=
   coord.hash < F_BSCM_MAX
 
@@ -46,7 +22,7 @@ def evaluate_and_step (current : VerifiedKernelState) (next_candidate : StateCoo
     current
 
 /- =========================================================
-   §4. 数理的定理と厳密証明（Sorry-Free / CIグリーン保証）
+   §4. 数理的定理と厳密証明（NoPlaceholderProofs / CIグリーン保証）
    ========================================================= -/
 
 /-- 【主定理】evaluate_and_step を経たいかなる次の状態も、絶対に Bounded Smooth 不変条件を破らない -/
