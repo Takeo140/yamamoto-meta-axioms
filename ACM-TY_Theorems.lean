@@ -199,13 +199,21 @@ theorem diffuse_not_average_in_general
     (hconn : Topology.conn top ⟨e.id % n⟩ ⟨nb.id % n⟩ = (2 : U64))
     (hstate : nb.state ≠ (⟨fun _ => 0⟩ : UHA n)) :
     DIFD.diffuse top e [nb] ≠ nb.state := by
-  sorry
-  -- Proof sketch (not discharged here): unfold diffuse on a singleton
-  -- list, norm reduces to 2, and (2 : U64)⁻¹ = 0 by ZMod.inv_eq_of_not_unit
-  -- since 2 is not a unit in ZMod (2^64) for the standard 2-adic reason;
-  -- 0 • total = 0 ≠ nb.state by hstate. This sorry is left in
-  -- deliberately: closing it requires pinning down GIFE's actual
-  -- namespace/import path, which I don't have confirmed against your
-  -- build. Everything in Parts A–C above is sorry-free.
+  -- Reduce the singleton folds for total and norm to their concrete values
+  have h_total : List.foldl (fun acc nb' =>
+    let w := Topology.conn top ⟨e.id % n⟩ ⟨nb'.id % n⟩; UHA.add acc (UHA.smul w nb'.state))
+    (⟨fun _ => (0 : U64)⟩ : UHA n) [nb] =
+    UHA.smul (Topology.conn top ⟨e.id % n⟩ ⟨nb.id % n⟩) nb.state := by
+    simp [List.foldl]
+  have h_norm : List.foldl (fun a nb' => a + Topology.conn top ⟨e.id % n⟩ ⟨nb'.id % n⟩)
+    (0 : U64) [nb] = Topology.conn top ⟨e.id % n⟩ ⟨nb.id % n⟩ := by
+    simp [List.foldl]
+  simp [DIFD.diffuse, h_total, h_norm, hconn]
+  -- 2 is not a unit in ZMod (2^64), so its inverse is 0
+  have : ¬ IsUnit (2 : U64) := by decide
+  have inv2_zero := ZMod.inv_eq_zero_of_not_unit this
+  simp [inv2_zero]
+  -- Now diffuse reduces to 0, which is not equal to nb.state by hypothesis
+  exact Ne.symm hstate
 
 end DIFD
