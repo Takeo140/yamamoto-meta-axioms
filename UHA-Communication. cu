@@ -1,0 +1,118 @@
+// ============================================================
+// UHA Communication Engine — Unified GPU Implementation
+// ============================================================
+
+#include <stdint.h>
+
+// -------------------------------
+// 1. Signal (UHA vector)
+// -------------------------------
+struct Signal {
+    uint64_t* coords;   // length = n
+    int n;
+};
+
+// -------------------------------
+// 2. Channel (Unitary-like operator)
+// -------------------------------
+struct ChannelGPU {
+    uint64_t* H;        // [n × n] matrix
+    int n;
+};
+
+// -------------------------------
+// 3. Channel propagation (MIMO / beamforming)
+// -------------------------------
+__global__ void uha_channel_apply(
+    const uint64_t* H,
+    const uint64_t* x,
+    uint64_t* out,
+    int n
+) {
+    int i = threadIdx.x;
+    if (i < n) {
+        uint64_t acc = 0;
+        for (int j = 0; j < n; ++j) {
+            acc += H[i*n + j] * x[j];
+        }
+        out[i] = acc;
+    }
+}
+
+// -------------------------------
+// 4. Signal norm (energy / SNR)
+// -------------------------------
+__global__ void uha_signal_norm(
+    const uint64_t* x,
+    uint64_t* out,
+    int n
+) {
+    uint64_t acc = 0;
+    for (int i = 0; i < n; ++i) {
+        acc += x[i] * x[i];
+    }
+    *out = acc;
+}
+
+// -------------------------------
+// 5. Error correction (algebraic code kernel)
+// -------------------------------
+__global__ void uha_error_correct(
+    const uint64_t* x,
+    const uint64_t* y,
+    const uint64_t* c,
+    uint64_t* out,
+    int n
+) {
+    int i = threadIdx.x;
+    if (i < n) {
+        uint64_t acc = 0;
+        for (int j = 0; j < n; ++j) {
+            for (int k = 0; k < n; ++k) {
+                acc += x[j] * y[k] * c[(j*n + k)*n + i];
+            }
+        }
+        out[i] = acc;
+    }
+}
+
+// ============================================================
+// 6. Unified Communication Engine
+// ============================================================
+class UHAComm {
+public:
+    Signal sig;
+    ChannelGPU channel;
+    uint64_t* snr_out;
+
+    // ---- Channel propagation ----
+    void propagate() {
+        uha_channel_apply<<<1, sig.n>>>(
+            channel.H,
+            sig.coords,
+            sig.coords,
+            sig.n
+        );
+    }
+
+    // ---- Signal energy / SNR ----
+    uint64_t snr() {
+        uha_signal_norm<<<1,1>>>(
+            sig.coords,
+            snr_out,
+            sig.n
+        );
+        return *snr_out;
+    }
+
+    // ---- Error correction (code kernel) ----
+    void correct(const Signal& x, const Signal& y, const uint64_t* c) {
+        uha_error_correct<<<1, sig.n>>>(
+            x.coords,
+            y.coords,
+            c,
+            sig.coords,
+            sig.n
+        );
+    }
+};
