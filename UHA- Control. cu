@@ -1,0 +1,85 @@
+// ============================================================
+// UHA Control Engine — Unified GPU Implementation
+// ============================================================
+
+#include <stdint.h>
+
+// -------------------------------
+// 1. Control State (UHA vector)
+// -------------------------------
+struct ControlState {
+    uint64_t* coords;   // length = n
+    int n;
+};
+
+// -------------------------------
+// 2. Unitary-like Controller (UOp)
+// -------------------------------
+struct UOpGPU {
+    uint64_t* M;        // [n × n] matrix
+    int n;
+};
+
+// -------------------------------
+// 3. Control Step (state transition)
+// -------------------------------
+__global__ void uha_control_step(
+    const uint64_t* M,
+    const uint64_t* x,
+    uint64_t* out,
+    int n
+) {
+    int i = threadIdx.x;
+    if (i < n) {
+        uint64_t acc = 0;
+        for (int j = 0; j < n; ++j) {
+            acc += M[i*n + j] * x[j];
+        }
+        out[i] = acc;
+    }
+}
+
+// -------------------------------
+// 4. Energy / Stability Norm
+// -------------------------------
+__global__ void uha_control_norm(
+    const uint64_t* x,
+    uint64_t* out,
+    int n
+) {
+    uint64_t acc = 0;
+    for (int i = 0; i < n; ++i) {
+        acc += x[i] * x[i];
+    }
+    *out = acc;
+}
+
+// ============================================================
+// 5. Unified Control Engine
+// ============================================================
+class UHAControl {
+public:
+    ControlState state;
+    UOpGPU controller;
+    uint64_t* energy_out;
+
+    // ---- 状態遷移（制御ステップ） ----
+    void step() {
+        uha_control_step<<<1, state.n>>>(
+            controller.M,
+            state.coords,
+            state.coords,
+            state.n
+        );
+    }
+
+    // ---- 安定性指標（エネルギー） ----
+    uint64_t energy() {
+        uha_control_norm<<<1,1>>>(
+            state.coords,
+            energy_out,
+            state.n
+        );
+        return *energy_out;
+    }
+};
