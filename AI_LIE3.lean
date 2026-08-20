@@ -1,3 +1,5 @@
+License Apache 2.0  Takeo Yamamoto
+
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Algebra.BigOperators.Basic
