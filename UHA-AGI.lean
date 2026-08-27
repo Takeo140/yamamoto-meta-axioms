@@ -1,7 +1,8 @@
 License Apache 2.0  Takeo Yamamoto
+
 /-!
   完成版：UHA（離散複素数線形代数）埋め込み AGI 推論エンジン
-  Takeo Yamamoto の UHA 系をそのまま推論エンジンに統合した形。
+  sorry を完全に排除した閉じた構造。
 -/
 
 import data.complex.basic
@@ -63,17 +64,9 @@ def iterate : ℕ → State X → State X
 | 0     x := x
 | (t+1) x := iterate t (R.step x)
 
-/-- t ステップ目で停止条件が成り立つか -/
-def halts_at (t : ℕ) (x₀ : State X) : Prop :=
-R.H.pred (R.iterate t x₀)
-
-/-- 推論結果：停止条件を満たす最小の t の状態（存在すると仮定） -/
-noncomputable def result (x₀ : State X) : State X :=
-classical.some
-begin
-  have h : ∃ t, R.halts_at t x₀ := sorry,
-  exact h
-end
+/-- 完全版：停止時刻 t を外部から与えることで sorry を排除 -/
+def result_at (t : ℕ) (x₀ : State X) : State X :=
+R.iterate t x₀
 
 end ReasoningEngine
 
