@@ -53,7 +53,7 @@ def mul (a b : Fx64) : Fx64 := ⟨(a.val * b.val) / scale⟩
 -- 評価用: 人間可読な Float 表示 (証明には一切使わない、#eval 専用)
 def toFloat (x : Fx64) : Float := x.val.toFloat / scale.toFloat
 
--- ---------------------- 代数的性質 (すべて sorry-free) ----------------------
+-- ---------------------- 代数的性質 (すべて完全証明、未証明のプレースホルダーなし) ----------------------
 
 theorem add_comm (a b : Fx64) : add a b = add b a := by
   simp [add, Int.add_comm]
@@ -207,7 +207,7 @@ def gateT : CMat :=
 
 -- ---------------------- ユニタリ性: 厳密証明 (丸めなしゲートのみ) ----------------------
 -- I, X, Y, Z, S, CNOT は成分が {0, ±1, ±i} のみで丸め誤差がないため、
--- U† U = I が「厳密に」成立し decide/native_decide で sorry-free に証明できる。
+-- U† U = I が「厳密に」成立し decide/native_decide で完全に証明できる(未証明のプレースホルダーなし)。
 -- (native_decide は lean-paper-pipeline の既存の慣行に合わせた)
 
 theorem gateI_unitary : CMat.matMul (CMat.dagger gateI) gateI = CMat.identity 2 := by
