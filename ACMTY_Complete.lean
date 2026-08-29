@@ -25,8 +25,11 @@ def LinOp64 := Matrix (Fin 64) (Fin 64) ℂ
 /-- Gen-3: Metric & Norm (計量とノルム)
     空間内の距離とエネルギー状態（作用量）を測るための定義 -/
 def normSq (v : DCVec64) : ℂ :=
-  -- 複素ノルムの二乗和（実際の実装では実数に射影するが理論上はℂとして扱う）
-  sorry
+  -- ベクトル（Fin 64 → ℂ）をリストに変換
+  let lst := List.ofFn v
+  -- ゼロ（複素数）を初期値として、各成分の2乗和を計算
+  lst.foldl (fun acc x => acc + x * x) (0 : ℂ)
+
 
 /-- Gen-4: F-Theory Base Axiom (F理論・最小作用の基底公理)
     いかなる構造も、系全体の作用量を最小化する方向へ向かうというメタ公理 -/
