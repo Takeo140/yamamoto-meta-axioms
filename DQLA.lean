@@ -1,5 +1,3 @@
-License Apache 2.0  Takeo Yamamoto
-
 import Mathlib
 
 /-!
