@@ -1,14 +1,9 @@
 /-
   ACM‑TY: Abstract Computation Model — Takeo Yamamoto (Physical AI Edition)
-  完全版 Lean 4 実装 / Extreme Optimized & AI-Integrated
+  完全版 Lean 4 実装 / Extreme Optimized & AI-Integrated (Sorry-Free)
   UHA × BSCM × DIFD × GIFE × Evolution × Quantized AI
   License: Apache 2.0
   Author: Takeo Yamamoto
-  
-  【アップデート内容】
-  1. Quantized AI Coreの統合: U64有限体上で動作するニューラルネットを追加し、流体(DIFD)の外力として作用。
-  2. In-place Array Mutation: ListをArrayに置換し、Id.runとmut変数でメモリアロケーションをゼロに最適化。
-  3. ZModの不等号比較最適化: .valを介した比較により安全に型レベルの制約をクリア。
 -/
 
 import Mathlib.Data.ZMod.Basic
@@ -54,7 +49,6 @@ structure NeuralNet (n : Nat) where
   weights : Fin n → Fin n → U64
   biases  : Fin n → U64
 
--- ZMod上での非線形活性化関数（簡易ReLUモドキ）
 @[inline] def activate (x : U64) : U64 :=
   if x.val % 2 = 0 then x else x / 2
 
@@ -96,7 +90,7 @@ structure Entity (n : Nat) where
   mood     : U64
   genome   : U64
   discrete : U64
-  nn       : QAI.NeuralNet n -- AI層をEntityに埋め込み
+  nn       : QAI.NeuralNet n
 
 structure Topology (n : Nat) where
   connMatrix : Fin n → Fin n → U64
@@ -106,7 +100,6 @@ structure Topology (n : Nat) where
 @[inline] def Topology.conn {n : Nat} (top : Topology n) (i j : Fin n) : U64 :=
   top.connMatrix i j
 
--- List を Array に変更し破壊的更新を可能に
 structure FieldState (n : Nat) where
   entities : Array (Entity n)
   entropy  : U64
@@ -117,7 +110,11 @@ structure FieldState (n : Nat) where
   4. DIFD — Discrete Fluid Dynamics（AI駆動流体核）
 ─────────────────────────────────────────────/
 namespace DIFD
-variable {n : Nat}
+variable {n : Nat} [NeZero n]
+
+-- sorryを排除するための安全なFin変換ヘルパー
+@[inline] def toFin (i : Nat) : Fin n :=
+  ⟨i % n, Nat.mod_lt _ (Nat.pos_of_ne_zero (NeZero.ne n))⟩
 
 @[inline] def clipViscosity (v : U64) : U64 :=
   if v.val > 1000000 then 1000000 else v
@@ -130,21 +127,20 @@ variable {n : Nat}
 
 def diffuse (top : Topology n) (e : Entity n) (neighbors : Array (Entity n)) : UHA n :=
   let total := neighbors.foldl (fun acc nb =>
-      let w := Topology.conn top ⟨e.id % n, sorry⟩ ⟨nb.id % n, sorry⟩
+      let w := Topology.conn top (toFin e.id) (toFin nb.id)
       UHA.add acc (UHA.smul w nb.state)
     ) ⟨fun _ => 0⟩
   let norm_val := neighbors.foldl (fun a nb => 
-      a + Topology.conn top ⟨e.id % n, sorry⟩ ⟨nb.id % n, sorry⟩
+      a + Topology.conn top (toFin e.id) (toFin nb.id)
     ) 0
   if norm_val.val = 0 then e.state else UHA.smul norm_val⁻¹ total
 
--- 完成版AI流体更新則: 拡散・渦度・圧力に加えて、AIネットワークからの推論(Force)を加算
 def fluidUpdateAI (top : Topology n) (entropy : U64) (e : Entity n) (neighbors : Array (Entity n)) : UHA n :=
   let visc := clipViscosity top.viscosity
   let d    := diffuse top e neighbors
   let v    := UHA.smul (top.curvature / 2) e.state
   let p    := UHA.smul (normalizePressure entropy) e.state
-  let ai_f := QAI.forward e.nn e.state -- AIによる環境への推論介入
+  let ai_f := QAI.forward e.nn e.state
 
   if cfl d visc then
     UHA.add (UHA.add (UHA.add d v) p) ai_f
@@ -196,15 +192,14 @@ structure Engine (n : Nat) where
   evolution : Evolution n
   takeoCore : Option (EvolutionCore n)
 
-def updateEntityUnified {n : Nat} (dyn : Dynamics n) (top : Topology n) (entropy : U64) (neighbors : Array (Entity n)) (e : Entity n) : Entity n :=
+def updateEntityUnified {n : Nat} [NeZero n] (dyn : Dynamics n) (top : Topology n) (entropy : U64) (neighbors : Array (Entity n)) (e : Entity n) : Entity n :=
   let fluidState := DIFD.fluidUpdateAI top entropy e neighbors
   let contState  := Unified.discreteToContinuous e.discrete fluidState
   let newDisc    := Unified.continuousToDiscrete contState
   let base       := dyn.updateEntity e entropy
   { base with state := contState, discrete := newDisc }
 
--- Arrayとmut変数によるIn-place Mutation
-def stepClassic {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
+def stepClassic {n : Nat} [NeZero n] (eng : Engine n) (s : FieldState n) : FieldState n :=
   Id.run do
     let mut updatedEntities := Array.mkEmpty s.entities.size
     for e in s.entities do
@@ -235,7 +230,6 @@ def stepClassic {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
 
 def argmaxEntity {n : Nat} (core : EvolutionCore n) (env : FieldState n) : Entity n :=
   if core.diversity.size == 0 then
-    -- デフォルトEntity（ダミー）
     { id := 0, state := ⟨fun _ => 0⟩, energy := 0, mood := 0, genome := 0, discrete := 0, nn := { weights := fun _ _ => 0, biases := fun _ => 0 } }
   else
     Id.run do
@@ -252,18 +246,19 @@ def stepTakeo {n : Nat} (eng : Engine n) (core : EvolutionCore n) (prev curr : F
     { entities := #[best], entropy := curr.entropy, topology := curr.topology }
   else prev
 
-def step {n : Nat} (eng : Engine n) (s : FieldState n) : FieldState n :=
+def step {n : Nat} [NeZero n] (eng : Engine n) (s : FieldState n) : FieldState n :=
   match eng.takeoCore with
   | none      => stepClassic eng s
   | some core => 
       let next := stepClassic eng s
       stepTakeo eng core s next
 
+
 /──────────────────────────────────────────────
   9. シミュレーション実行 (In-place Loop)
 ─────────────────────────────────────────────/
 
-def simulate {n : Nat} (eng : Engine n) (init : FieldState n) (steps : Nat) : FieldState n :=
+def simulate {n : Nat} [NeZero n] (eng : Engine n) (init : FieldState n) (steps : Nat) : FieldState n :=
   Id.run do
     let mut current := init
     for _ in [0:steps] do
