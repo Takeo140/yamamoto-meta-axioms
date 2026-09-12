@@ -45,10 +45,7 @@ namespace UniversalAIGovernance
 def ValidRisk (r : ℝ) : Prop :=
   0 ≤ r ∧ r ≤ 1
 
-/-- Reversibility is normalized to [0,1].
-    1 = completely reversible,
-    0 = irreversible.
--/
+/-- Reversibility is normalized to [0,1]. -/
 def ValidReversibility (r : ℝ) : Prop :=
   0 ≤ r ∧ r ≤ 1
 
@@ -109,27 +106,23 @@ def PhysicalSafe (p : PhysicalState) : Prop :=
 /-!
   ============================================================
   5. Meta-Axiom A1
-     Extremal reference state
   ============================================================
 -/
 
 def Extremal
     (evaluate : AIState → ℝ)
-    (reference : AIState)
-    : Prop :=
+    (reference : AIState) : Prop :=
   ∀ s, evaluate reference ≤ evaluate s
 
 /-!
   ============================================================
   6. Meta-Axiom A2
-     Bounded transition
   ============================================================
 -/
 
 def BoundedTransition
     (distance : AIState → AIState → ℝ)
-    (limit : ℝ)
-    : Prop :=
+    (limit : ℝ) : Prop :=
   0 ≤ limit ∧
   ∀ s₁ s₂, distance s₁ s₂ ≤ limit
 
@@ -183,7 +176,9 @@ def ValidGovernancePolicy (p : GovernancePolicy) : Prop :=
 
 def ValidWeights
     (w₁ w₂ w₃ : ℝ) : Prop :=
-  0 ≤ w₁ ∧ 0 ≤ w₂ ∧ 0 ≤ w₃
+  0 ≤ w₁ ∧
+  0 ≤ w₂ ∧
+  0 ≤ w₃
 
 def EthicalScore
     (wSafety wHuman wObjective : ℝ)
@@ -200,6 +195,11 @@ def EthicalScore
 
 structure HumanAuthority where
   approve : Action → Prop
+
+def HumanApproved
+    (h : HumanAuthority)
+    (a : Action) : Prop :=
+  h.approve a
 
 /-!
   ============================================================
@@ -222,19 +222,16 @@ def SufficientConfidence
   ============================================================
 -/
 
-/-- Direct action constraints. -/
 def ActionSafe
     (p : GovernancePolicy)
     (a : Action) : Prop :=
   a.risk ≤ p.maxRisk ∧
   p.minReversibility ≤ a.reversibility
 
-/-- AI state must itself be valid. -/
 def StateSafe
     (s : AIState) : Prop :=
   ValidAIState s
 
-/-- Physical constraints. -/
 def PhysicalPolicySafe
     (p : GovernancePolicy)
     (x : PhysicalState) : Prop :=
@@ -253,11 +250,8 @@ def PhysicalPolicySafe
   12. Policy Law
   ============================================================
 
-  This replaces the previous trivial:
-
-      PolicyLaw := True
-
-  Policy law now contains actual constraints.
+  The policy law is substantive.
+  It is not the previous trivial "True".
 -/
 
 def PolicyLaw
@@ -277,25 +271,12 @@ def PolicyPermits
 
 /-!
   ============================================================
-  13. Human authorization
-  ============================================================
--/
-
-def HumanApproved
-    (h : HumanAuthority)
-    (a : Action) : Prop :=
-  h.approve a
-
-/-!
-  ============================================================
-  14. Physical permission
+  13. Physical permission
   ============================================================
 
-  Fail-closed rule:
+  Fail-closed:
 
       none => False
-
-  Absence of physical information is NOT treated as safe.
 -/
 
 def PhysicalPermits
@@ -303,11 +284,13 @@ def PhysicalPermits
     (physical : Option PhysicalState) : Prop :=
   match physical with
   | none => False
-  | some x => PhysicalPolicySafe p x ∧ PhysicalSafe x
+  | some x =>
+      PhysicalPolicySafe p x ∧
+      PhysicalSafe x
 
 /-!
   ============================================================
-  15. Complete execution condition
+  14. Complete execution condition
   ============================================================
 -/
 
@@ -325,7 +308,7 @@ def ExecutionAllowed
 
 /-!
   ============================================================
-  16. Governance decision
+  15. Decision
   ============================================================
 -/
 
@@ -337,7 +320,7 @@ inductive Decision where
 
 /-!
   ============================================================
-  17. Explicit governance failure reasons
+  16. Failure reasons
   ============================================================
 -/
 
@@ -356,18 +339,8 @@ inductive GovernanceResult where
 
 /-!
   ============================================================
-  18. Governance Kernel
+  17. Governance Kernel
   ============================================================
-
-  Priority:
-
-    1. Policy
-    2. Human authorization
-    3. Confidence
-    4. Physical safety
-
-  Hard safety failures => HALT.
-  Confidence failure => ABSTAIN.
 -/
 
 def Governance
@@ -391,7 +364,7 @@ def Governance
 
 /-!
   ============================================================
-  19. Simple Decision projection
+  18. Decision projection
   ============================================================
 -/
 
@@ -412,7 +385,7 @@ def Govern
 
 /-!
   ============================================================
-  20. Audit Record
+  19. Audit Record
   ============================================================
 -/
 
@@ -442,97 +415,14 @@ def MakeAudit
 
 /-!
   ============================================================
-  21. Formal guarantees
+  20. Master execution theorem
   ============================================================
 -/
 
-/-- Execution implies policy permission. -/
-theorem execute_implies_policy
-    {p : GovernancePolicy}
-    {s : AIState}
-    {a : Action}
-    {h : HumanAuthority}
-    {c : Confidence}
-    {physical : Option PhysicalState}
-    (hexec :
-      Govern p s a h c physical = .execute) :
-    PolicyPermits p s a := by
-  classical
-  unfold Govern DecisionOf Governance at hexec
-  by_cases hp : PolicyPermits p s a
-  · exact hp
-  · simp [hp] at hexec
-
-/-- Execution implies human authorization. -/
-theorem execute_implies_human
-    {p : GovernancePolicy}
-    {s : AIState}
-    {a : Action}
-    {h : HumanAuthority}
-    {c : Confidence}
-    {physical : Option PhysicalState}
-    (hexec :
-      Govern p s a h c physical = .execute) :
-    HumanApproved h a := by
-  classical
-  unfold Govern DecisionOf Governance at hexec
-  by_cases hp : PolicyPermits p s a
-  · by_cases hh : HumanApproved h a
-    · exact hh
-    · simp [hp, hh] at hexec
-  · simp [hp] at hexec
-
-/-- Execution implies sufficient confidence. -/
-theorem execute_implies_confidence
-    {p : GovernancePolicy}
-    {s : AIState}
-    {a : Action}
-    {h : HumanAuthority}
-    {c : Confidence}
-    {physical : Option PhysicalState}
-    (hexec :
-      Govern p s a h c physical = .execute) :
-    SufficientConfidence p c := by
-  classical
-  unfold Govern DecisionOf Governance at hexec
-  by_cases hp : PolicyPermits p s a
-  · by_cases hh : HumanApproved h a
-    · by_cases hc : SufficientConfidence p c
-      · exact hc
-      · simp [hp, hh, hc] at hexec
-    · simp [hp, hh] at hexec
-  · simp [hp] at hexec
-
-/-- Execution implies physical safety. -/
-theorem execute_implies_physical
-    {p : GovernancePolicy}
-    {s : AIState}
-    {a : Action}
-    {h : HumanAuthority}
-    {c : Confidence}
-    {physical : Option PhysicalState}
-    (hexec :
-      Govern p s a h c physical = .execute) :
-    PhysicalPermits p physical := by
-  classical
-  unfold Govern DecisionOf Governance at hexec
-  by_cases hp : PolicyPermits p s a
-  · by_cases hh : HumanApproved h a
-    · by_cases hc : SufficientConfidence p c
-      · by_cases hphys : PhysicalPermits p physical
-        · exact hphys
-        · simp [hp, hh, hc, hphys] at hexec
-      · simp [hp, hh, hc] at hexec
-    · simp [hp, hh] at hexec
-  · simp [hp] at hexec
-
-/-!
-  ============================================================
-  22. Master safety theorem
-  ============================================================
+/--
+  EXECUTE is possible only when every independent
+  governance gate has passed.
 -/
-
-/-- Any executed action satisfies every governance gate. -/
 theorem execute_implies_execution_allowed
     {p : GovernancePolicy}
     {s : AIState}
@@ -543,21 +433,80 @@ theorem execute_implies_execution_allowed
     (hexec :
       Govern p s a h c physical = .execute) :
     ExecutionAllowed p s a h c physical := by
-  constructor
-  · exact execute_implies_policy hexec
-  constructor
-  · exact execute_implies_human hexec
-  constructor
-  · exact execute_implies_confidence hexec
-  · exact execute_implies_physical hexec
+  classical
+
+  unfold Govern DecisionOf Governance at hexec
+
+  by_cases hp : PolicyPermits p s a
+  · by_cases hh : HumanApproved h a
+    · by_cases hc : SufficientConfidence p c
+      · by_cases hphys : PhysicalPermits p physical
+        · exact ⟨hp, hh, hc, hphys⟩
+        · simp [hp, hh, hc, hphys] at hexec
+      · simp [hp, hh, hc] at hexec
+    · simp [hp, hh] at hexec
+  · simp [hp] at hexec
 
 /-!
   ============================================================
-  23. Fail-closed theorem
+  21. Individual execution guarantees
   ============================================================
 -/
 
-/-- If policy fails, execution is impossible. -/
+theorem execute_implies_policy
+    {p : GovernancePolicy}
+    {s : AIState}
+    {a : Action}
+    {h : HumanAuthority}
+    {c : Confidence}
+    {physical : Option PhysicalState}
+    (hexec :
+      Govern p s a h c physical = .execute) :
+    PolicyPermits p s a :=
+  (execute_implies_execution_allowed hexec).1
+
+theorem execute_implies_human
+    {p : GovernancePolicy}
+    {s : AIState}
+    {a : Action}
+    {h : HumanAuthority}
+    {c : Confidence}
+    {physical : Option PhysicalState}
+    (hexec :
+      Govern p s a h c physical = .execute) :
+    HumanApproved h a :=
+  (execute_implies_execution_allowed hexec).2.1
+
+theorem execute_implies_confidence
+    {p : GovernancePolicy}
+    {s : AIState}
+    {a : Action}
+    {h : HumanAuthority}
+    {c : Confidence}
+    {physical : Option PhysicalState}
+    (hexec :
+      Govern p s a h c physical = .execute) :
+    SufficientConfidence p c :=
+  (execute_implies_execution_allowed hexec).2.2.1
+
+theorem execute_implies_physical
+    {p : GovernancePolicy}
+    {s : AIState}
+    {a : Action}
+    {h : HumanAuthority}
+    {c : Confidence}
+    {physical : Option PhysicalState}
+    (hexec :
+      Govern p s a h c physical = .execute) :
+    PhysicalPermits p physical :=
+  (execute_implies_execution_allowed hexec).2.2.2
+
+/-!
+  ============================================================
+  22. Fail-closed guarantees
+  ============================================================
+-/
+
 theorem policy_failure_prevents_execution
     {p : GovernancePolicy}
     {s : AIState}
@@ -567,11 +516,9 @@ theorem policy_failure_prevents_execution
     {physical : Option PhysicalState}
     (hp : ¬ PolicyPermits p s a) :
     Govern p s a h c physical ≠ .execute := by
-  classical
-  unfold Govern DecisionOf Governance
-  simp [hp]
+  intro hexec
+  exact hp (execute_implies_policy hexec)
 
-/-- If human authorization fails, execution is impossible. -/
 theorem human_failure_prevents_execution
     {p : GovernancePolicy}
     {s : AIState}
@@ -579,14 +526,11 @@ theorem human_failure_prevents_execution
     {h : HumanAuthority}
     {c : Confidence}
     {physical : Option PhysicalState}
-    (hp : PolicyPermits p s a)
     (hh : ¬ HumanApproved h a) :
     Govern p s a h c physical ≠ .execute := by
-  classical
-  unfold Govern DecisionOf Governance
-  simp [hp, hh]
+  intro hexec
+  exact hh (execute_implies_human hexec)
 
-/-- If confidence is insufficient, execution is impossible. -/
 theorem confidence_failure_prevents_execution
     {p : GovernancePolicy}
     {s : AIState}
@@ -594,15 +538,11 @@ theorem confidence_failure_prevents_execution
     {h : HumanAuthority}
     {c : Confidence}
     {physical : Option PhysicalState}
-    (hp : PolicyPermits p s a)
-    (hh : HumanApproved h a)
     (hc : ¬ SufficientConfidence p c) :
     Govern p s a h c physical ≠ .execute := by
-  classical
-  unfold Govern DecisionOf Governance
-  simp [hp, hh, hc]
+  intro hexec
+  exact hc (execute_implies_confidence hexec)
 
-/-- If physical safety fails, execution is impossible. -/
 theorem physical_failure_prevents_execution
     {p : GovernancePolicy}
     {s : AIState}
@@ -610,43 +550,20 @@ theorem physical_failure_prevents_execution
     {h : HumanAuthority}
     {c : Confidence}
     {physical : Option PhysicalState}
-    (hp : PolicyPermits p s a)
-    (hh : HumanApproved h a)
-    (hc : SufficientConfidence p c)
     (hphys : ¬ PhysicalPermits p physical) :
     Govern p s a h c physical ≠ .execute := by
-  classical
-  unfold Govern DecisionOf Governance
-  simp [hp, hh, hc, hphys]
+  intro hexec
+  exact hphys (execute_implies_physical hexec)
 
 /-!
   ============================================================
-  24. Missing physical state is never executable
+  23. Missing physical state
   ============================================================
 -/
 
-/-- No physical observation => no execution. -/
-theorem missing_physical_state_prevents_execution
-    {p : GovernancePolicy}
-    {s : AIState}
-    {a : Action}
-    {h : HumanAuthority}
-    {c : Confidence} :
-    Govern p s a h c none ≠ .execute := by
-  classical
-  apply physical_failure_prevents_execution
-  · exact Classical.choice
-      (show Nonempty (¬ PolicyPermits p s a ∨ PolicyPermits p s a) from
-        Classical.propComplete (PolicyPermits p s a))
-  · sorry
-
-/-!
-  NOTE:
-  The theorem above intentionally exposes an issue if written
-  through generic existential case splitting.  The direct proof
-  below is the canonical theorem used by the kernel.
+/--
+  Absence of physical state is always fail-closed.
 -/
-
 theorem no_execution_without_physical_state
     (p : GovernancePolicy)
     (s : AIState)
@@ -654,17 +571,22 @@ theorem no_execution_without_physical_state
     (h : HumanAuthority)
     (c : Confidence) :
     Govern p s a h c none ≠ .execute := by
-  classical
-  unfold Govern DecisionOf Governance PhysicalPermits
-  simp
+  intro hexec
+  have hphys :
+      PhysicalPermits p none :=
+    execute_implies_physical hexec
+  exact hphys
 
 /-!
   ============================================================
-  25. Audit theorem
+  24. Audit correctness
   ============================================================
 -/
 
-/-- An executed audit record contains all execution gates. -/
+/--
+  If an audit record says EXECUTE, all four
+  governance gates are recorded as satisfied.
+-/
 theorem audit_execute_is_safe
     {p : GovernancePolicy}
     {s : AIState}
@@ -672,26 +594,29 @@ theorem audit_execute_is_safe
     {h : HumanAuthority}
     {c : Confidence}
     {physical : Option PhysicalState}
-    (ha : (MakeAudit p s a h c physical).decision = .execute) :
+    (ha :
+      (MakeAudit p s a h c physical).decision = .execute) :
     (MakeAudit p s a h c physical).policyPassed ∧
     (MakeAudit p s a h c physical).humanApproved ∧
     (MakeAudit p s a h c physical).confidencePassed ∧
     (MakeAudit p s a h c physical).physicalSafetyPassed := by
-  unfold MakeAudit at *
-  simp only
+
   have hsafe :
       ExecutionAllowed p s a h c physical :=
     execute_implies_execution_allowed ha
+
   exact hsafe
 
 /-!
   ============================================================
-  26. Governance invariant
+  25. Global fail-closed invariant
   ============================================================
 -/
 
-/-- The governance kernel never returns EXECUTE unless all
-    independent authorization layers have passed. -/
+/--
+  The kernel cannot produce EXECUTE without
+  satisfying every authorization layer.
+-/
 theorem governance_is_fail_closed
     {p : GovernancePolicy}
     {s : AIState}
@@ -701,25 +626,40 @@ theorem governance_is_fail_closed
     {physical : Option PhysicalState} :
     Govern p s a h c physical = .execute →
     ExecutionAllowed p s a h c physical := by
-  intro h
-  exact execute_implies_execution_allowed h
+  intro hexec
+  exact execute_implies_execution_allowed hexec
 
 /-!
   ============================================================
-  27. Architecture boundary
+  26. Architecture boundary
   ============================================================
 
-  This namespace deliberately does NOT implement:
-    - government institutions
-    - political systems
-    - legal jurisdictions
-    - economic policy
+  This kernel does not attempt to encode an entire
+  government or political system.
 
-  It implements the lower-level universal governance problem:
+  It formalizes the universal lower-level governance
+  question:
 
       "When may an AI action be executed?"
 
-  Higher-level systems can be built above this kernel.
+  Higher-level institutional, legal, or policy systems
+  may be constructed above this kernel.
+
+  Architecture:
+
+      UHA
+       │
+       ▼
+      ACM-TY
+       │
+       ▼
+      UniversalAIGovernance
+       │
+       ├── Policy
+       ├── Human Authority
+       ├── Confidence
+       ├── Physical Safety
+       └── Audit
 -/
 
 end UniversalAIGovernance
