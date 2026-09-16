@@ -1,6 +1,6 @@
 /-
   ACM-TY: Abstract Computation Model
-  World Model Edition — Takeo Yamamoto
+  World Model Core — Takeo Yamamoto
 
   UHA × BSCM × DIFD × GIFE × QAI
   × Evolution × Predictive World Model
