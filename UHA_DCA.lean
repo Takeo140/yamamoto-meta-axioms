@@ -1,3 +1,4 @@
+License Apache 2.0  Takeo Yamamoto
 namespace UHACore
 
 /-!
