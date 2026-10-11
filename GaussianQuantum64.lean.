@@ -1,0 +1,219 @@
+License Apache 2.0  Takeo Yamamoto
+import Mathlib
+
+/-!
+# UHA 離散型量子計算核（64ビット版）
+
+ガウス整数 Z[i] の振幅を、U64 := ZMod (2^64) の成分で持つ 64ビット計算核。
+同じ定義を ℤ（厳密）と U64（64ビット）の両方に使えるよう、環 R で一般化している。
+
+  実際の振幅 = amp[i] / (√2)^k        （H は非正規化 H' = [[1,1],[1,-1]] を使う）
+  測定確率   = N(amp[i]) / 2^k        （N(a+bi) = a² + b²）
+
+## 64ビットで厳密になる条件
+全振幅のノルム和は 2^k なので、各成分は |成分| ≤ 2^(k/2)。
+k ≤ 62 なら、全成分とノルムが符号付き64ビットに収まり、
+U64 上の wraparound 演算の結果は ℤ 上の厳密値と一致する。
+`step` は k が 62 に達した状態でさらに H を適用すると `none` を返す（fail-closed）。
+
+## 証明済みの橋渡し
+- `lift` : GI ℤ → GI U64 は加法・乗法・符号反転・ノルムを保存する
+- 具体回路では ℤ 厳密実行と U64 実行の一致を検査する
+
+Apache 2.0
+-/
+
+namespace GaussQ64
+
+/-- 64ビット環 -/
+abbrev U64 := ZMod (2 ^ 64)
+
+/-- ガウス整数 a + b i（成分は環 R） -/
+structure GI (R : Type) where
+  re : R
+  im : R
+  deriving DecidableEq, Repr
+
+namespace GI
+
+variable {R : Type} [CommRing R]
+
+def zero : GI R := ⟨0, 0⟩
+def one : GI R := ⟨1, 0⟩
+def I : GI R := ⟨0, 1⟩
+
+instance : Add (GI R) := ⟨fun z w => ⟨z.re + w.re, z.im + w.im⟩⟩
+instance : Neg (GI R) := ⟨fun z => ⟨-z.re, -z.im⟩⟩
+instance : Mul (GI R) :=
+  ⟨fun z w => ⟨z.re * w.re - z.im * w.im, z.re * w.im + z.im * w.re⟩⟩
+
+@[simp] theorem add_def (z w : GI R) : z + w = ⟨z.re + w.re, z.im + w.im⟩ := rfl
+@[simp] theorem neg_def (z : GI R) : -z = ⟨-z.re, -z.im⟩ := rfl
+@[simp] theorem mul_def (z w : GI R) :
+    z * w = ⟨z.re * w.re - z.im * w.im, z.re * w.im + z.im * w.re⟩ := rfl
+
+/-- ノルム N(a+bi) = a² + b²（確率の分子） -/
+def norm (z : GI R) : R := z.re * z.re + z.im * z.im
+
+/-- ノルムは乗法的 -/
+theorem norm_mul (z w : GI R) : (z * w).norm = z.norm * w.norm := by
+  simp only [mul_def, GI.norm]
+  ring
+
+end GI
+
+/-- 厳密側（ℤ[i]） -/
+abbrev GZ := GI Int
+/-- 64ビット側（U64[i]） -/
+abbrev G64 := GI U64
+
+/-- ℤ[i] → U64[i]（mod 2^64 への還元） -/
+def lift (z : GZ) : G64 := ⟨(z.re : U64), (z.im : U64)⟩
+
+theorem lift_add (z w : GZ) : lift (z + w) = lift z + lift w := by
+  simp [lift]
+
+theorem lift_neg (z : GZ) : lift (-z) = -lift z := by
+  simp [lift]
+
+theorem lift_mul (z w : GZ) : lift (z * w) = lift z * lift w := by
+  simp [lift]
+
+/-- ノルムも還元と可換 -/
+theorem lift_norm (z : GZ) : (lift z).norm = ((z.norm : Int) : U64) := by
+  simp [lift, GI.norm]
+
+/-! ## 量子状態と回路 -/
+
+/-- 振幅リスト（長さ 2^n）と √2 の冪指数 k -/
+structure QState (R : Type) where
+  amp : List (GI R)
+  k : Nat
+  deriving DecidableEq, Repr
+
+namespace QState
+
+variable {R : Type} [CommRing R]
+
+/-- |0…0⟩ -/
+def init (n : Nat) : QState R :=
+  ⟨GI.one :: List.replicate (2 ^ n - 1) GI.zero, 0⟩
+
+def get (s : QState R) (i : Nat) : GI R := s.amp.getD i GI.zero
+
+/-- 1量子ビットゲート [[m00,m01],[m10,m11]] を量子ビット q に作用 -/
+def apply1 (m00 m01 m10 m11 : GI R) (q : Nat) (s : QState R) : QState R :=
+  let mask := 1 <<< q
+  { s with
+    amp := (List.range s.amp.length).map fun i =>
+      if i.testBit q then
+        m10 * s.get (i ^^^ mask) + m11 * s.get i
+      else
+        m00 * s.get i + m01 * s.get (i ||| mask) }
+
+def gX (q : Nat) (s : QState R) : QState R := apply1 GI.zero GI.one GI.one GI.zero q s
+def gZ (q : Nat) (s : QState R) : QState R := apply1 GI.one GI.zero GI.zero (-GI.one) q s
+def gS (q : Nat) (s : QState R) : QState R := apply1 GI.one GI.zero GI.zero GI.I q s
+
+/-- 非正規化 Hadamard。k を 1 増やす。 -/
+def gH (q : Nat) (s : QState R) : QState R :=
+  let t := apply1 GI.one GI.one GI.one (-GI.one) q s
+  { t with k := s.k + 1 }
+
+/-- CNOT（制御 c、標的 t） -/
+def gCNOT (c t : Nat) (s : QState R) : QState R :=
+  let mask := 1 <<< t
+  { s with
+    amp := (List.range s.amp.length).map fun i =>
+      if i.testBit c then s.get (i ^^^ mask) else s.get i }
+
+/-- 厳密状態の 64ビット還元 -/
+def lift (s : QState Int) : QState U64 :=
+  ⟨s.amp.map GaussQ64.lift, s.k⟩
+
+/-- 測定確率の分子（確率 = 分子 / 2^k）。k ≤ 62 で厳密。 -/
+def weights (s : QState U64) : List Nat := s.amp.map fun z => z.norm.val
+
+end QState
+
+/-! ## 回路（データ）と fail-closed な実行 -/
+
+inductive Gate
+  | X (q : Nat)
+  | Z (q : Nat)
+  | S (q : Nat)
+  | H (q : Nat)
+  | CNOT (c t : Nat)
+  deriving DecidableEq, Repr
+
+/-- k がこの値に達したら H を拒否（64ビットで厳密を保つ上限） -/
+def kMax : Nat := 62
+
+section Exec
+
+variable {R : Type} [CommRing R]
+
+/-- 量子ビット添字が範囲内か -/
+def validQ (s : QState R) (q : Nat) : Bool := (1 <<< q) < s.amp.length
+
+/-- 1ステップ。範囲外・c = t・k 上限超過は `none`（fail-closed）。 -/
+def step (g : Gate) (s : QState R) : Option (QState R) :=
+  match g with
+  | .X q => if validQ s q then some (QState.gX q s) else none
+  | .Z q => if validQ s q then some (QState.gZ q s) else none
+  | .S q => if validQ s q then some (QState.gS q s) else none
+  | .H q => if validQ s q && decide (s.k < kMax) then some (QState.gH q s) else none
+  | .CNOT c t =>
+      if validQ s c && validQ s t && decide (c ≠ t)
+      then some (QState.gCNOT c t s) else none
+
+def exec : List Gate → QState R → Option (QState R)
+  | [], s => some s
+  | g :: gs, s =>
+      match step g s with
+      | none => none
+      | some t => exec gs t
+
+end Exec
+
+/-! ## 検査 -/
+
+def bellC : List Gate := [.H 0, .CNOT 0 1]
+def ghzC : List Gate := [.H 0, .CNOT 0 1, .CNOT 1 2]
+def phaseC : List Gate := [.H 0, .S 0, .H 0]
+def interfereC : List Gate := [.H 0, .H 0]
+
+/-- 厳密（ℤ）実行 -/
+def runZ (n : Nat) (c : List Gate) : Option (QState Int) := exec c (QState.init n)
+/-- 64ビット（U64）実行 -/
+def run64 (n : Nat) (c : List Gate) : Option (QState U64) := exec c (QState.init n)
+
+/-- 64ビット実行 = 厳密実行を mod 2^64 に還元したもの（具体回路での一致） -/
+example : (runZ 2 bellC).map QState.lift = run64 2 bellC := by native_decide
+example : (runZ 3 ghzC).map QState.lift = run64 3 ghzC := by native_decide
+example : (runZ 1 phaseC).map QState.lift = run64 1 phaseC := by native_decide
+example : (runZ 1 interfereC).map QState.lift = run64 1 interfereC := by native_decide
+
+/-- 確率の分子（Bell: |00⟩,|11⟩ が 1/2 ずつ、分母 2^1） -/
+example : (run64 2 bellC).map QState.weights = some [1, 0, 0, 1] := by native_decide
+example : (run64 3 ghzC).map QState.weights = some [1, 0, 0, 0, 0, 0, 0, 1] := by native_decide
+/-- 位相 i により確率が 1/2 ずつに割れる -/
+example : (run64 1 phaseC).map QState.weights = some [2, 2] := by native_decide
+/-- H を2回で干渉して |0⟩ に戻る（4 / 2² = 1） -/
+example : (run64 1 interfereC).map QState.weights = some [4, 0] := by native_decide
+
+/-- 全確率の和 = 1（分子の和 = 2^k）。k = 62 でも U64 に収まる。 -/
+example :
+    (run64 1 (List.replicate 62 (Gate.H 0))).map
+      (fun s => (s.weights.sum, 2 ^ s.k)) = some (2 ^ 62, 2 ^ 62) := by native_decide
+
+/-- 上限超過は拒否される（fail-closed） -/
+example : run64 1 (List.replicate 63 (Gate.H 0)) = none := by native_decide
+/-- 範囲外の量子ビット、c = t も拒否される -/
+example : run64 1 [Gate.X 5] = none := by native_decide
+example : run64 2 [Gate.CNOT 0 0] = none := by native_decide
+
+#eval (run64 2 bellC).map QState.weights
+#eval (run64 1 phaseC).map QState.weights
+
+end GaussQ64
