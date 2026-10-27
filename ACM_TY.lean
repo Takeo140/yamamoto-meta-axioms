@@ -120,7 +120,7 @@ def norm (x : UHA n) : U64 :=
 def diagConst (n : Nat) : Fin n → Fin n → UHA n :=
   fun j k => ⟨fun i => if j = k ∧ k = i then (1 : U64) else 0⟩
 
-/-! ### 双線形性（sorry なし） -/
+/-! ### 双線形性 -/
 
 theorem mulWith_add_left (c : Fin n → Fin n → UHA n) (x x' y : UHA n) :
     mulWith c (x + x') y = mulWith c x y + mulWith c x' y := by
