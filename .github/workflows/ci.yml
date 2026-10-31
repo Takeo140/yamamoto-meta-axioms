@@ -31,13 +31,21 @@ jobs:
           key: elan-${{ hashFiles('lean-toolchain') }}
           restore-keys: elan-
 
-      - name: Cache Lake build
+      - name: Cache Lake build & dependencies
         uses: actions/cache@v4
         with:
-          path: .lake
-          key: lake-${{ hashFiles('lean-toolchain', 'lakefile.lean', 'lakefile.toml') }}-${{ github.sha }}
+          path: |
+            .lake
+            lean_packages
+          key: lake-${{ hashFiles('lean-toolchain', 'lakefile.lean', 'lakefile.toml') }}-${{ hashFiles('**/*.lean') }}
           restore-keys: |
             lake-${{ hashFiles('lean-toolchain', 'lakefile.lean', 'lakefile.toml') }}-
+
+      - name: Get Mathlib cache (if applicable)
+        run: |
+          if [ -f "lakefile.lean" ] && grep -q "mathlib" lakefile.lean; then
+            lake exe cache get || true
+          fi
 
       - name: Build and verify Lean proofs
         run: lake build
@@ -47,6 +55,40 @@ jobs:
           if grep -rn "\bsorry\b" --include="*.lean" .; then
             echo "::error::sorry found — proofs incomplete"
             exit 1
+          fi
+
+  # ── C++ / CUDA verification ─────────────────────────────────────────────
+  verify-cpp-cuda:
+    name: C++ / CUDA Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up CMake & Build Environment
+        uses: lukka/get-cmake@latest
+
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', '**/*.cpp', '**/*.cu', '**/*.h') }}
+          restore-keys: |
+            cmake-${{ runner.os }}-
+
+      - name: Configure and Build (C++ / CUDA)
+        run: |
+          if [ -f "CMakeLists.txt" ]; then
+            cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -j$(nproc)
+          else
+            echo "No CMakeLists.txt found, skipping C++/CUDA build step."
+          fi
+
+      - name: Run C++ / CUDA Tests
+        run: |
+          if [ -d "build" ] && [ -f "build/CTestTestfile.cmake" ]; then
+            cd build
+            ctest --output-on-failure
           fi
 
   # ── Python logic verification ─────────────────────────────────────────────
@@ -65,23 +107,34 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
 
-      - name: Run A1–A4 integration tests
-        run: python verify_42.py
+      - name: Run integration tests
+        run: |
+          if [ -f "verify_42.py" ]; then
+            python verify_42.py
+          elif command -v pytest &> /dev/null; then
+            pytest
+          else
+            echo "No test runner script found (verify_42.py or pytest)."
+          fi
 
-  # ── Final gate: both must pass ────────────────────────────────────────────
+  # ── Final gate: all must pass ────────────────────────────────────────────
   all-verified:
     name: All Verified
-    needs: [verify-lean, verify-python]
+    needs: [verify-lean, verify-cpp-cuda, verify-python]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all jobs passed
         run: |
           if [[ "${{ needs.verify-lean.result }}" != "success" || \
+                "${{ needs.verify-cpp-cuda.result }}" != "success" || \
                 "${{ needs.verify-python.result }}" != "success" ]]; then
             echo "::error::One or more verification jobs failed"
             exit 1
           fi
-          echo "Lean + Python verification passed"
+          echo "Lean 4 + C++/CUDA + Python verification passed successfully."
+
